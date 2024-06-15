@@ -1,0 +1,14 @@
+black
+flake8
+lxml
+matplotlib
+multiprocess
+mypy
+networkx
+numpy
+pandas
+scikit-umfpack
+scipy
+symengine
+sympy==1.3
+typing_extensions

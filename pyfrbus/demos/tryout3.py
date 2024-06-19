@@ -41,7 +41,8 @@ inst = ["fgdp", "fgdpt", "fpic", "fpc", "frl10", "frs10"]
 no_pandemic = frbus.solve(start, end, with_adds)
 no_stayhome = frbus.mcontrol(start, end, no_pandemic, targ, traj, inst)
 
-
+no_pandemic.to_csv("no_pandemic.csv", index=True)
+no_stayhome.to_csv("no_stayhome.csv", index=True)
 
 
 

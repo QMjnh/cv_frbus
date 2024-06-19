@@ -93,18 +93,19 @@ foreign_const = data.copy(deep=True)
 # this is achieved by setting _trac for variables reflects foreign economies (to keep them the same as the baseline) 
 # and set _trac for import and export variables to reflect the pandemic's impact on the US economy
 
-foreign_const["fpic_trac"] = dummy['fpic_trac']
-foreign_const["fpi10_trac"] = dummy['fpi10_trac']
-foreign_const["fxgap_trac"] = dummy['fxgap_trac']
-foreign_const["fgdp_trac"] = dummy['fgdp_trac']
-foreign_const["fgdpt_trac"] = dummy['fgdpt_trac']
-foreign_const["fpc_trac"] = dummy['fpc_trac']
-foreign_const["frl10_trac"] = dummy['frl10_trac']
-foreign_const["frs10_trac"] = dummy['frs10_trac']
+foreign_const["fpic_trac"] = dummy['fpic_trac']     # foreign CPI (G39, bilateral export trade weights)
+foreign_const["fpi10_trac"] = dummy['fpi10_trac']   # foreign CPI (G10)
+foreign_const["fxgap_trac"] = dummy['fxgap_trac']   # foreign output gap
+foreign_const["fgdp_trac"] = dummy['fgdp_trac']     # foreign GDP (world)
+foreign_const["fgdpt_trac"] = dummy['fgdpt_trac']   # foreign GDP trend (world)
+foreign_const["fpc_trac"] = dummy['fpc_trac']       # foreign aggregate consumer price (G39)
+foreign_const["frl10_trac"] = dummy['frl10_trac']   # foreign long-term interest rate (G10)
+foreign_const["frs10_trac"] = dummy['frs10_trac']   # foreign short-term interest rate (G10)
+
 # foreign_const["fpitrg_trac"] = dummy['fpitrg_trac'] # exogenous, doesnt work
 # foreign_const["frstar_trac"] = dummy['frstar_trac'] # makes the fpic simulation worse
 
-foreign_const["fpx_trac"] = dummy['fpx_trac']
+foreign_const["fpx_trac"] = dummy['fpx_trac']       # nominal exchange rate (G39)
 foreign_const["fpxr_trac"] = dummy['fpxr_trac']
 
 ## export 

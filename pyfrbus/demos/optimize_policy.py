@@ -13,68 +13,71 @@ frbus = Frbus("../models/model.xml")
 start = pd.Period("2019Q4")
 end = "2023Q4"
 
+# no pandemic scenario
 no_pandemic = frbus.solve(start, end, data)
 
-# Set up trajectories to match the historical data
-no_pandemic.loc[start:end, "fgdp_t"] = data.loc[start:end, "fgdp"]     # foreign GDP (world)
-no_pandemic.loc[start:end, "fgdpt_t"] = data.loc[start:end, "fgdpt"]   # foreign GDP trend (world)
-no_pandemic.loc[start:end, "fpic_t"] = data.loc[start:end, "fpic"]     # foreign CPI (bilateral export trade weights)
 
+# no stay-at-home orders, foreign activity and expectations match the historical data
+no_stayhome_data = no_pandemic.copy(deep=True)
+variables = pd.read_csv("model_variables_simple.csv")
+const_variables = variables[(variables["sector"]=="Foreign Activity") | (variables["sector"]=="Expectations")].name
 
-no_pandemic.loc[start:end, "fpc_t"] = data.loc[start:end, 'fpc']       # foreign aggregate consumer price (G39)
-no_pandemic.loc[start:end, "frl10_t"] = data.loc[start:end, 'frl10']   # foreign long-term interest rate (G10)
-no_pandemic.loc[start:end, "frs10_t"] = data.loc[start:end, 'frs10']   # foreign short-term interest rate (G10)
+targ_no_stayhome = []
+traj_no_stayhome = []
+inst_no_stayhome = []
 
+for name in const_variables:
+    try:
+        no_stayhome_data.loc[start:end, f"{name}_t"] = data.loc[start:end, name]
+        targ_no_stayhome.append(name)
+        traj_no_stayhome.append(f"{name}_t")
+        inst_no_stayhome.append(name)
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-
-stay_home_total = 17 # weeks
+stay_home_total = 17 # num. weeks stay-at-home orders were in effect for all America
 start_stayhome = pd.Period("2020Q2")
 end_stayhome = pd.Period("2020Q2")
-no_pandemic.loc[start_stayhome:end_stayhome, "lurnat_t"] = data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1-.019)**stay_home_total      # natural rate of unemployment rate
-no_pandemic.loc[start_stayhome:end_stayhome, "lur_t"] = data.loc[start_stayhome:end_stayhome, 'lur'] * (1-.019)**stay_home_total      # rate of unemployment rate
+no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1-.019)**stay_home_total      # natural rate of unemployment rate
+no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_t"] = data.loc[start_stayhome:end_stayhome, 'lur'] * (1-.019)**stay_home_total      # rate of unemployment rate
 
-no_pandemic.loc[end_stayhome+1:end, "lurnat_t"] = data.loc[end_stayhome+1:end, 'lurnat']
-no_pandemic.loc[end_stayhome+1:end, "lur_t"] = data.loc[end_stayhome+1:end, 'lur']
+no_stayhome_data.loc[end_stayhome+1:end, "lurnat_t"] = data.loc[end_stayhome+1:end, 'lurnat']
+no_stayhome_data.loc[end_stayhome+1:end, "lur_t"] = data.loc[end_stayhome+1:end, 'lur']
 
 # Define the target variables and their trajectories
-targ_no_stayhome = ["fgdp", "fgdpt", "fpic", "fpc", "frl10", "frs10", 'lur', 'lurnat']
-traj_no_stayhome = ["fgdp_t", "fgdpt_t", "fpic_t", "fpc_t", "frl10_t", "frs10_t", 'lur_t', 'lurnat_t']
-
-# Define instruments as add-factors for flexibility
-# inst = ["fgdp_aerr", "fgdpt_aerr", "fpic_aerr"]
-inst_no_stayhome = ["fgdp", "fgdpt", "fpic", "fpc", "frl10", "frs10", 'lur', 'lurnat']
-# inst = ["fgdp_aerr", "fgdpt_aerr", "fpic_aerr", "fpc_aerr", "frl10_aerr", "frs10_aerr"]
+targ_no_stayhome +=['lur', 'lurnat']
+traj_no_stayhome +=['lur_t', 'lurnat_t']
+inst_no_stayhome +=['lur', 'lurnat']
 
 # Run mcontrol to match the target variables to their trajectories
+no_stayhome = frbus.mcontrol(start, end, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
 
-no_stayhome = frbus.mcontrol(start, end, no_pandemic, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
 
-# print("concho", no_pandemic.loc['2020Q1':'2020Q4', 'lur'])
 
-targ_custom = ["fgdp", "fgdpt", "fpic", "fpc", "frl10", "frs10", 'lur', 'lurnat']
-traj_custom = ["fgdp_t", "fgdpt_t", "fpic_t", "fpc_t", "frl10_t", "frs10_t", "lur_t", 'lurnat_t']
-inst_custom = ["fgdp", "fgdpt", "fpic", "fpc", "frl10", "frs10", 'lur', 'lurnat']
+# custom stay-at-home order
+
+targ_custom = targ_no_stayhome.copy()
+traj_custom = traj_no_stayhome.copy()
+inst_custom = inst_no_stayhome.copy()
 
 start_lockdown_opt = pd.Period("2020Q2")
 end_lockdown_opt = pd.Period("2020Q2")
 
-# print(no_stayhome.loc[end_lockdown_opt:end, 'lurnat_t'])
-# print(no_stayhome.loc[end_lockdown_opt:end, 'lur_t'])
-
 
 lockdown_duration = 17 # duration in weeks
-no_stayhome.loc[start_lockdown_opt:end_lockdown_opt, "lur_t"] = no_stayhome.loc[start_lockdown_opt:end_lockdown_opt, 'lur'] * 1.019**lockdown_duration 
-# no_stayhome.loc[start_lockdown_opt:end_lockdown_opt, "lur_t"] *=  1.019**lockdown_duration
+custom_stayhome_data = no_stayhome.copy(deep=True)
 
-no_stayhome.loc[start_lockdown_opt:end_lockdown_opt, "lurnat_t"] = no_stayhome.loc[start_lockdown_opt:end_lockdown_opt, 'lurnat'] * 1.019**lockdown_duration
-# no_stayhome.loc[start_lockdown_opt:end_lockdown_opt, "lurnat_t"] *=  (1.019)**lockdown_duration
-# print('no_stayhome')
-# print(no_stayhome.loc[end_lockdown_opt:end, 'lurnat_t'])
-# print(no_stayhome.loc[end_lockdown_opt:end, 'lur_t'])
+custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, "lur_t"] = custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, 'lur'] * (1.019**lockdown_duration)
+custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, "lurnat_t"] = custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, 'lurnat'] * (1.019**lockdown_duration)
+
+# print(custom_stayhome_data.loc[start_lockdown_opt:end, 'lurnat_t'])
+# print(custom_stayhome_data.loc[start_lockdown_opt:end, 'lur_t'])
+
+# print(custom_stayhome_data.loc[end_lockdown_opt:end, 'lur_t'])
 
 # print('data')
 # print(custom_stayhome.loc[end_lockdown_opt:end, 'lurnat_t'])
-custom_stayhome = frbus.mcontrol(start_lockdown_opt, end_lockdown_opt, no_stayhome, targ_custom, traj_custom, inst_custom)
+custom_stayhome = frbus.mcontrol(start_lockdown_opt, end_lockdown_opt, custom_stayhome_data, targ_custom, traj_custom, inst_custom) 
 custom_stayhome = frbus.solve(end_lockdown_opt, end, custom_stayhome)
 custom_stayhome = frbus.mcontrol(end_lockdown_opt, end, custom_stayhome, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
 

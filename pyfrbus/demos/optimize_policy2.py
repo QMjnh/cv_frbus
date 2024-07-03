@@ -16,14 +16,19 @@ end = "2023Q4"
 
 # Solve for no pandemic scenario
 no_pandemic = frbus.solve(start, end, data)
+print((no_pandemic['lur_trac'].values))
+print("shape1", no_pandemic.shape)
 
 # Create no stay-at-home orders scenario
 no_stayhome_data = no_pandemic.copy(deep=True)
 no_stayhome_data = frbus.init_trac(start, end, no_stayhome_data)
+print('shape2', no_stayhome_data.shape)
+print((no_stayhome_data['lur_trac'].values))
 
 # Load model variables
 variables = pd.read_csv("model_variables_simple.csv")
-dynamic_variables = variables[(variables["sector"] == "Labor Market") | (variables["sector"] == "Household Expenditures")].name
+dynamic_variables = variables[(variables["sector"] == "Labor Market") | (variables["sector"] == "Household Expenditures")
+                            | (variables["sector"] == "Aggregate Output Identities")].name
 
 # print(changing_variables)
 
@@ -40,11 +45,16 @@ for name in dynamic_variables:
     except Exception as e:
         print(f"An error occurred with variable {name}: {e}")
 
+print('shape3', no_stayhome_data.shape)
+print((no_stayhome_data['lur_trac'].values))
 
-print(set(no_stayhome_data['ec_trac'].values))
-print((no_stayhome_data['xgdp'].values))
-print(len(no_stayhome_data['xgdp'].values))
-print(len(no_stayhome_data['xgdpt'].values))
+# print(set(no_stayhome_data['ec_trac'].values))
+# # print((no_stayhome_data['xgdp'].values))
+# print('delta1')
+# print(no_stayhome_data['xgdp'].values - no_stayhome_data['xgdp_trac'].values)
+# print('delta2')
+# print(len(no_stayhome_data['xgdp'].values))
+# print(len(no_stayhome_data['xgdpt'].values))
 
 
 # Adjust unemployment rates for stay-at-home orders

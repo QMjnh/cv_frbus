@@ -83,5 +83,6 @@ def cal_daly(num_infected, num_death):
   daly = cal_yld(num_infected) + cal_yll(num_death)
   return daly
 
-def cal_econ_loss(num_infected, num_death, price_per_daly=95075):
+def cal_econ_daly(covasim_model, policy:dict, price_per_daly=95075):
+  num_infected, num_death = covasim_model(policy)
   return cal_daly(num_infected, num_death) * price_per_daly

@@ -40,13 +40,16 @@ for name in dynamic_variables:
         # targ_no_stayhome.append(name)
         # traj_no_stayhome.append(f"{name}_t")
         # inst_no_stayhome.append(name)
-        no_stayhome_data[f"{name}_trac"] = np.zeros(len(no_stayhome_data))
+        print(f"{name}_trac")
+        # no_stayhome_data[f"{name}_trac"] = np.zeros(len(no_stayhome_data))
+        no_stayhome_data.drop([f"{name}_trac"], axis=1, inplace=True)
+        print(no_stayhome_data.shape)
 
     except Exception as e:
         print(f"An error occurred with variable {name}: {e}")
 
 print('shape3', no_stayhome_data.shape)
-print((no_stayhome_data['lur_trac'].values))
+# print((no_stayhome_data['lur_trac'].values))
 
 # print(set(no_stayhome_data['ec_trac'].values))
 # # print((no_stayhome_data['xgdp'].values))
@@ -62,12 +65,18 @@ stay_home_total = 17  # weeks
 start_stayhome = pd.Period("2020Q2")
 end_stayhome = pd.Period("2020Q2")
 
+no_stayhome_data["lurnat_trac"] = data['lurnat']
+no_stayhome_data["lur_trac"] = data['lur']
+
 no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_trac"] = data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1 - .019)**stay_home_total
 no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_trac"] = data.loc[start_stayhome:end_stayhome, 'lur'] * (1 - .019)**stay_home_total
 
 no_stayhome_data.loc[end_stayhome + 1:end, "lurnat_trac"] = data.loc[end_stayhome + 1:end, 'lurnat']
 no_stayhome_data.loc[end_stayhome + 1:end, "lur_trac"] = data.loc[end_stayhome + 1:end, 'lur']
 
+print(no_stayhome_data.loc[start:end, 'lurnat_trac'])
+print('shape4', data.loc[start_stayhome:end_stayhome, 'lurnat'])
+print(set(data.loc[start_stayhome:end_stayhome, 'lurnat'].values))
 print(set(no_stayhome_data['lurnat_trac'].values))
 print(set(no_stayhome_data['lur_trac'].values))
 # Update target and trajectory lists
@@ -77,7 +86,7 @@ print(set(no_stayhome_data['lur_trac'].values))
 
 # Run mcontrol to match the target variables to their trajectories
 # no_stayhome = frbus.mcontrol(start, end, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
-no_stayhome = frbus.solve(start, end, no_stayhome_data)
+# no_stayhome = frbus.solve(start, end, no_stayhome_data)
 
 # Adjust for anticipated errors during stay-at-home period
 stayhome_aerr_data = no_stayhome.copy(deep=True)

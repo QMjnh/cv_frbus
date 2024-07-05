@@ -65,10 +65,14 @@ def gradient_descent_with_adam(f, policy:dict, learning_rate=0.001, beta1=0.9, b
         print(f'Loss: {f(*args)}')
         policy_history.append(policy.copy())
         loss_history.append(f(*args))
-    return policy
+
+    best_policy = policy_history[np.argmin(loss_history)]
+    return best_policy, policy_history, loss_history
 
 
 
 def main():
     gradient_descent(total_econ_loss, policy)
 
+if __name__ == '__main__':
+    main()

@@ -1,7 +1,8 @@
 import numpy as np
 import scipy.linalg
 import inspect
-
+import matplotlib.pyplot as plt
+import pandas as pd
 
 '''Part 1: Manipulating Jacobians'''
 
@@ -59,3 +60,59 @@ def factored_solve(Z, y):
 def input_list(f):
     """Return list of function inputs"""
     return inspect.getfullargspec(f).args
+
+
+def plot_results(td1, td2, name1, name2, ss, end_week, fig_name='./png/fig1.png', df1_name='./csv/td1.csv', df2_name='./csv/td2.csv'):
+    fig1, axes = plt.subplots(2, 3, figsize=(.8*12, .8*8))
+    ax = axes.flatten()
+
+    ax[0].plot(100 * td1['I'][:end_week], label=name1, linewidth=2)
+    ax[0].plot(100 * td2['I'][:end_week], label=name2, linewidth=2)
+    ax[0].set_title('Infected, I')
+    ax[0].set_ylabel('% of initial population')
+    ax[0].legend()
+
+    ax[1].plot(100 * td1['S'][:end_week], label=name1, linewidth=2)
+    ax[1].plot(100 * td2['S'][:end_week], label=name2, linewidth=2)
+    ax[1].set_title('Susceptibles, S')
+    ax[1].set_ylabel('% of initial population')
+    ax[1].legend()
+
+    ax[2].plot(100 * td1['R'][:end_week], label=name1, linewidth=2)
+    ax[2].plot(100 * td2['R'][:end_week], label=name2, linewidth=2)
+    ax[2].set_title('Recovered, R')
+    ax[2].set_ylabel('% of initial population')
+    ax[2].legend()
+
+    ax[3].plot(100 * td1['D'][:end_week], label=name1, linewidth=2)
+    ax[3].plot(100 * td2['D'][:end_week], label=name2, linewidth=2)
+    ax[3].set_title('Deaths, D')
+    ax[3].set_ylabel('% of initial population')
+    ax[3].set_xlabel('weeks')
+    ax[3].legend()
+
+    ax[4].plot(100 * (td1['C'] / ss['C'] - 1)[:end_week], label=name1, linewidth=2)
+    ax[4].plot(100 * (td2['C'] / ss['C'] - 1)[:end_week], label=name2, linewidth=2)
+    ax[4].axhline(0, color='gray', linestyle='--')
+    ax[4].set_title('Aggregate Consumption, C')
+    ax[4].set_ylabel('% deviation from initial ss')
+    ax[4].set_xlabel('weeks')
+    ax[4].legend()
+
+    ax[5].plot(100 * (td1['N'] / ss['N'] - 1)[:end_week], label=name1, linewidth=2)
+    ax[5].plot(100 * (td2['N'] / ss['N'] - 1)[:end_week], label=name2, linewidth=2)
+    ax[5].axhline(0, color='gray', linestyle='--')
+    ax[5].set_title('Aggregate Hours, N')
+    ax[5].set_ylabel('% deviation from initial ss')
+    ax[5].set_xlabel('weeks')
+    ax[5].legend()
+
+    plt.tight_layout()
+    
+    df1 = pd.DataFrame(td1)
+    df2 = pd.DataFrame(td2)
+    plt.savefig(fig_name)
+    df1.to_csv(df1_name)
+    df2.to_csv(df2_name)
+    plt.show()
+    plt.close()

@@ -374,7 +374,7 @@ def fig12(h=150, H=250):
 
     df1 = pd.DataFrame(td1)
     df2 = pd.DataFrame(td2)
-    plt.savefig('./png/fig12.png')
+    plt.savefig('./png/fig1.png')
     df1.to_csv('./csv/td1.csv')
     df2.to_csv('./csv/td2.csv')
     plt.show()
@@ -402,6 +402,10 @@ def fig12(h=150, H=250):
 
     plt.tight_layout()
     plt.show()
+
+    plt.savefig('./png/fig2.png')
+
+
     plt.close()
 
 

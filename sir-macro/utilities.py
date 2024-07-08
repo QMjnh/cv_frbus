@@ -3,6 +3,7 @@ import scipy.linalg
 import inspect
 import matplotlib.pyplot as plt
 import pandas as pd
+import math
 
 '''Part 1: Manipulating Jacobians'''
 
@@ -62,7 +63,7 @@ def input_list(f):
     return inspect.getfullargspec(f).args
 
 
-def plot_results(td1, td2, name1, name2, ss, end_week, fig_name='./png/fig1.png', df1_name='./csv/td1.csv', df2_name='./csv/td2.csv'):
+def plot_results_default(td1, td2, name1, name2, ss, end_week, fig_name='./png/fig1.png', df1_name='./csv/td1.csv', df2_name='./csv/td2.csv'):
     fig1, axes = plt.subplots(2, 3, figsize=(.8*12, .8*8))
     ax = axes.flatten()
 
@@ -106,6 +107,44 @@ def plot_results(td1, td2, name1, name2, ss, end_week, fig_name='./png/fig1.png'
     ax[5].set_ylabel('% deviation from initial ss')
     ax[5].set_xlabel('weeks')
     ax[5].legend()
+
+    plt.tight_layout()
+    
+    df1 = pd.DataFrame(td1)
+    df2 = pd.DataFrame(td2)
+    plt.savefig(fig_name)
+    df1.to_csv(df1_name)
+    df2.to_csv(df2_name)
+    plt.show()
+    plt.close()
+
+
+def plot_results_custom(td1, td2, name1, name2, ss, end_week, variables:[dict], fig_name='./png/fig1.png', df1_name='./csv/td1.csv', df2_name='./csv/td2.csv'):
+    num_vars = len(variables)
+    num_rows = math.ceil(num_vars / 3)  # Adjust as needed
+    num_cols = 3
+
+    fig1, axes = plt.subplots(num_rows, num_cols, figsize=(.8*4*num_cols, .8*4*num_rows))
+    ax = axes.flatten()
+
+    # i = 0 
+    # for var in variables.keys():
+    #     ax[i].plot(100 * td1[var][:end_week], label=name1, linewidth=2)
+    #     ax[i].plot(100 * td2[var][:end_week], label=name2, linewidth=2)
+    #     ax[i].set_title(variables[var])
+    #     ax[i].set_ylabel('% of initial population')
+    #     ax[i].set_xlabel('weeks')
+    #     ax[i].legend()
+    #     i+=1
+
+    for i in range(len(variables)):
+        ax[i].plot(100 * td1[variables[i]['key']][:end_week], label=name1, linewidth=2)
+        ax[i].plot(100 * td2[variables[i]['key']][:end_week], label=name2, linewidth=2)
+        ax[i].set_title(variables[i]['name'])
+        ax[i].set_ylabel(variables[i]['y_unit'])
+        ax[i].set_xlabel('weeks')
+        ax[i].legend()
+
 
     plt.tight_layout()
     

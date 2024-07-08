@@ -127,16 +127,6 @@ def plot_results_custom(td1, td2, name1, name2, ss, end_week, variables:[dict], 
     fig1, axes = plt.subplots(num_rows, num_cols, figsize=(.8*4*num_cols, .8*4*num_rows))
     ax = axes.flatten()
 
-    # i = 0 
-    # for var in variables.keys():
-    #     ax[i].plot(100 * td1[var][:end_week], label=name1, linewidth=2)
-    #     ax[i].plot(100 * td2[var][:end_week], label=name2, linewidth=2)
-    #     ax[i].set_title(variables[var])
-    #     ax[i].set_ylabel('% of initial population')
-    #     ax[i].set_xlabel('weeks')
-    #     ax[i].legend()
-    #     i+=1
-
     for i in range(len(variables)):
         ax[i].plot(100 * td1[variables[i]['key']][:end_week], label=name1, linewidth=2)
         ax[i].plot(100 * td2[variables[i]['key']][:end_week], label=name2, linewidth=2)

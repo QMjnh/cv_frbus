@@ -13,10 +13,12 @@ frbus = Frbus("../models/model.xml")
 start = pd.Period("2019Q4")
 end = "2023Q4"
 
-# Solve for no pandemic scenario
+############### Solve for no pandemic scenario ###############
 no_pandemic = frbus.solve(start, end, data)
 
-# Create no stay-at-home orders scenario
+
+
+############### Create no stay-at-home orders scenario ###############
 no_stayhome_data = no_pandemic.copy(deep=True)
 
 # Load model variables
@@ -32,7 +34,7 @@ for name in const_variables:
         traj_no_stayhome.append(f"{name}_t")
         inst_no_stayhome.append(name)
     except Exception as e:
-        print(f"An error occurred with variable {name}: {e}")
+        print(f"Can't create trajectory for variable '{name}', exception message: {e}")
 
 # Adjust unemployment rates for stay-at-home orders
 stay_home_total = 17  # weeks
@@ -68,11 +70,12 @@ for name in variables['name']:
     try:
         stayhome_aerr.loc[start:end, f"{name}_aerr"] = data.loc[start:end, name] - stayhome_aerr.loc[start:end, name]
     except Exception as e:
-        print(f"An error occurred with variable {name}: {e}")
+        print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
 
 
-# Custom stay-at-home order scenario
+
+############### Custom stay-at-home order scenario ###############
 targ_custom, traj_custom, inst_custom = targ_no_stayhome.copy(), traj_no_stayhome.copy(), inst_no_stayhome.copy()
 
 start_lockdown_opt = pd.Period("2020Q2")
@@ -93,7 +96,7 @@ for name in variables['name']:
     try:
         custom_stayhome[name] += stayhome_aerr[f"{name}_aerr"]
     except Exception as e:
-        print(f"An error occurred with variable {name}: {e}")
+        print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
 # Save results
 no_stayhome.to_csv("./results/external_const/no_stayhome.csv", index=True)

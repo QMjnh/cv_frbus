@@ -14,80 +14,41 @@ frbus = Frbus("../models/model.xml")
 start = pd.Period("2019Q4")
 end = "2023Q4"
 
-# Solve for no pandemic scenario
+############### Solve for no pandemic scenario ###############
 no_pandemic = frbus.solve(start, end, data)
-# print((no_pandemic['lur_trac'].values))
-# print("shape1", no_pandemic.shape)
 
-# Create no stay-at-home orders scenario
+
+############### Create no stay-at-home orders scenario ###############
 no_stayhome_data = no_pandemic.copy(deep=True)
 no_stayhome_data = frbus.init_trac(start, end, no_stayhome_data)
-# print('shape2', no_stayhome_data.shape)
-# print((no_stayhome_data['lur_trac'].values))
 
 # Load model variables
 variables = pd.read_csv("model_variables_simple.csv")
 dynamic_variables = variables[(variables["sector"] == "Labor Market") | (variables["sector"] == "Household Expenditures")
                             | (variables["sector"] == "Aggregate Output Identities")].name
 
-# print(changing_variables)
-
 targ_no_stayhome, traj_no_stayhome, inst_no_stayhome = [], [], []
 
 for name in dynamic_variables:
     try:
-        # no_stayhome_data.loc[start:end, f"{name}_t"] = data.loc[start:end, name]
-        # targ_no_stayhome.append(name)
-        # traj_no_stayhome.append(f"{name}_t")
-        # inst_no_stayhome.append(name)
-        # print(f"{name}_trac")
         no_stayhome_data[f"{name}_trac"] = np.zeros(len(no_stayhome_data))
-        # no_stayhome_data.drop([f"{name}_trac"], axis=1, inplace=True)
-        # print(no_stayhome_data.shape)
-
     except Exception as e:
-        print(f"An error occurred with variable {name}: {e}")
-
-# print('shape3', no_stayhome_data.shape)
-# print((no_stayhome_data['lur_trac'].values))
-
-# print(set(no_stayhome_data['ec_trac'].values))
-# # print((no_stayhome_data['xgdp'].values))
-# print('delta1')
-# print(no_stayhome_data['xgdp'].values - no_stayhome_data['xgdp_trac'].values)
-# print('delta2')
-# print(len(no_stayhome_data['xgdp'].values))
-# print(len(no_stayhome_data['xgdpt'].values))
-
+        print(f"Can't trac variable '{name}', exception message: {e}")
 
 # Adjust unemployment rates for stay-at-home orders
 stay_home_total = 17  # weeks
 start_stayhome = pd.Period("2020Q2")
 end_stayhome = pd.Period("2020Q2")
 
-# no_stayhome_data["lurnat_trac"] = data['lurnat']
-# no_stayhome_data["lur_trac"] = data['lur']
-
 no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1 - .019)**stay_home_total
 no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_t"] = data.loc[start_stayhome:end_stayhome, 'lur'] * (1 - .019)**stay_home_total
 
-# no_stayhome_data.loc[end_stayhome + 1:end, "lurnat_trac"] = data.loc[end_stayhome + 1:end, 'lurnat']
-# no_stayhome_data.loc[end_stayhome + 1:end, "lur_trac"] = data.loc[end_stayhome + 1:end, 'lur']
-
-# print(no_stayhome_data.loc[start:end, 'lurnat_trac'])
-# print('shape4', data.loc[start_stayhome:end_stayhome, 'lurnat'])
-# print(set(data.loc[start_stayhome:end_stayhome, 'lurnat'].values))
-# print(set(no_stayhome_data['lurnat_trac'].values))
-# print(set(no_stayhome_data['lur_trac'].values))
 
 # Update target and trajectory lists
 targ_no_stayhome += ['lur', 'lurnat']
 traj_no_stayhome += ['lur_t', 'lurnat_t']
 inst_no_stayhome += ['lur', 'lurnat']
 
-# targ_no_stayhome += ['lur']
-# traj_no_stayhome += ['lur_t']
-# inst_no_stayhome += ['lur']
 
 # Run mcontrol to match the target variables to their trajectories
 no_stayhome = frbus.mcontrol(start, end, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
@@ -108,16 +69,16 @@ for name in variables['name']:
     try:
         stayhome_aerr.loc[start:end, f"{name}_aerr"] = data.loc[start:end, name] - stayhome_aerr.loc[start:end, name]
     except Exception as e:
-        print(f"An error occurred with variable {name}: {e}")
+        print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
 
 
-# Custom stay-at-home order scenario
+############### Custom stay-at-home order scenario ###############
 targ_custom, traj_custom, inst_custom = targ_no_stayhome.copy(), traj_no_stayhome.copy(), inst_no_stayhome.copy()
 
 start_lockdown_opt = pd.Period("2020Q2")
 end_lockdown_opt = pd.Period("2020Q2")
-custom_lockdown_duration = 30  # weeks
+custom_lockdown_duration = 17  # weeks
 
 custom_stayhome_data = no_stayhome.copy(deep=True)
 
@@ -133,7 +94,7 @@ for name in variables['name']:
     try:
         custom_stayhome[name] += stayhome_aerr[f"{name}_aerr"]
     except Exception as e:
-        print(f"An error occurred with variable {name}: {e}")
+        print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
 # Save results
 no_stayhome.to_csv("./results/dynamic_labor_consumption/no_stayhome.csv", index=True)

@@ -1,3 +1,5 @@
+Download the epidemiology.csv file from https://health.google.com/covid-19/open-data/
+
 For calibration to run, go to analysis.py in the covasim package and edit the remove_db function:
 
 def remove_db(self):

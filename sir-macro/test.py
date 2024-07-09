@@ -6,6 +6,8 @@ from utilities import *
 H=150
 # end_week = 100
 ss = initial_ss() # pre-pandemic steady state
+print('steady state:', ss)
+
 td1 = td_solve(ctax=np.full(H, 0), pr_treat=np.zeros(H), pr_vacc=np.zeros(H), pi1=0.0046, pi2=7.3983, pi3=0.2055,
              eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=50,
              h=1E-4, tol=1E-8, noisy=True, H_U=None)
@@ -48,8 +50,8 @@ mus: Multiplier on infection probability
 lami, lams: Lagrange multipliers for infected and susceptible budget constraints
 P: Total population (1 - D)
 R1, R2, R3: Residuals for equilibrium conditions
-C: Aggregate consumption
-N: Aggregate labor supply
+C: Aggregate consumption (Consumption (C) equals output, which is productivity (A) times labor (N))
+N: Aggregate labor supply (hours worked)
 Neff: Effective labor supply (accounting for productivity loss of infected)
 walras: Walras' law check (should be close to zero)
 pid: Death probability

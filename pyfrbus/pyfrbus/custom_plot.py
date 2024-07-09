@@ -37,7 +37,7 @@ def custom_plot(dataframes: dict, start: str, end: str,
             if type == 'pct_change':
                 data = df[column].pct_change(4) * 100
                 data = data[plot_period]
-                title = ('pct_change ' + variables[variables.name == column].definition.values[0]) if column in variables.name.values else column
+                title = ('% change ' + variables[variables.name == column].definition.values[0]) if column in variables.name.values else column
             else:
                 data = df.loc[plot_period, column]
                 title = (variables[variables.name == column].definition.values[0]) if column in variables.name.values else column
@@ -52,7 +52,7 @@ def custom_plot(dataframes: dict, start: str, end: str,
             # If the title is too long, set it to the column name
             if len(title) > 50:
                 print(f"Title '{title}' is too long. Setting title to default.")
-                title = 'pct_change ' + column if 'pct_change' in title else column
+                title = '% change ' + column if '% change' in title else column
             
             # Use a different line style for each line
             line_style = line_styles[j % len(line_styles)]

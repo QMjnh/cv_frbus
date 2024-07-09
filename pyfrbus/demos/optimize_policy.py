@@ -105,7 +105,7 @@ dfs = {'baseline': data, 'custom_stayhome': custom_stayhome, 'no_stayhome': no_s
 plots = [
     {'column': 'xgdp', 'type': 'pct_change'},
     {'column': 'pcxfe', 'type': 'pct_change', 'name': 'PCE Price Index'},
-    {'column': 'xgdpt'},
+    {'column': 'ec', 'name': 'Consumption, cw 2012$'},
     {'column': 'pcpi', 'type': 'pct_change', 'name': 'CPI'}
 ]
 custom_plot(dfs, '2020Q1', '2023Q4', plots, variables, './results/external_const/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')

@@ -40,7 +40,7 @@ for name in dynamic_variables:
         # targ_no_stayhome.append(name)
         # traj_no_stayhome.append(f"{name}_t")
         # inst_no_stayhome.append(name)
-        print(f"{name}_trac")
+        # print(f"{name}_trac")
         no_stayhome_data[f"{name}_trac"] = np.zeros(len(no_stayhome_data))
         # no_stayhome_data.drop([f"{name}_trac"], axis=1, inplace=True)
         print(no_stayhome_data.shape)
@@ -48,7 +48,7 @@ for name in dynamic_variables:
     except Exception as e:
         print(f"An error occurred with variable {name}: {e}")
 
-print('shape3', no_stayhome_data.shape)
+# print('shape3', no_stayhome_data.shape)
 # print((no_stayhome_data['lur_trac'].values))
 
 # print(set(no_stayhome_data['ec_trac'].values))
@@ -145,7 +145,7 @@ dfs = {'baseline': data, 'custom_stayhome': custom_stayhome, 'no_stayhome': no_s
 plots = [
     {'column': 'xgdp', 'type': 'pct_change'},
     {'column': 'pcxfe', 'type': 'pct_change', 'name': 'PCE Price Index'},
-    {'column': 'xgdpt'},
+    {'column': 'ec'},
     {'column': 'pcpi', 'type': 'pct_change', 'name': 'CPI'}
 ]
 custom_plot(dfs, '2020Q1', '2023Q4', plots, variables, './results/dynamic_labor_consumption/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')

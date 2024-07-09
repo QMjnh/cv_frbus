@@ -43,7 +43,7 @@ for name in dynamic_variables:
         # print(f"{name}_trac")
         no_stayhome_data[f"{name}_trac"] = np.zeros(len(no_stayhome_data))
         # no_stayhome_data.drop([f"{name}_trac"], axis=1, inplace=True)
-        print(no_stayhome_data.shape)
+        # print(no_stayhome_data.shape)
 
     except Exception as e:
         print(f"An error occurred with variable {name}: {e}")
@@ -145,7 +145,7 @@ dfs = {'baseline': data, 'custom_stayhome': custom_stayhome, 'no_stayhome': no_s
 plots = [
     {'column': 'xgdp', 'type': 'pct_change'},
     {'column': 'pcxfe', 'type': 'pct_change', 'name': 'PCE Price Index'},
-    {'column': 'ec'},
+    {'column': 'ec', 'name': 'Consumption, cw 2012$'},
     {'column': 'pcpi', 'type': 'pct_change', 'name': 'CPI'}
 ]
 custom_plot(dfs, '2020Q1', '2023Q4', plots, variables, './results/dynamic_labor_consumption/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')

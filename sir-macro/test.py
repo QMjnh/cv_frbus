@@ -2,28 +2,67 @@ from main import *
 import numpy as np
 import matplotlib.pyplot as plt
 from utilities import *
+import pandas as pd
+from pandas import DataFrame
+# from find_policy import *
 
-H=150
-# end_week = 100
-ss = initial_ss() # pre-pandemic steady state
-print('steady state:', ss)
+sir_macro_policy = {
+        'vax': np.full(150, 1/52),
+        'treat': np.zeros(150),
+        'start_stayhome': 5, # start stayhome at week 5
+        'end_stayhome': 30, # end stayhome at week 30
+}
 
-td1 = td_solve(ctax=np.full(H, 0), pr_treat=np.zeros(H), pr_vacc=np.zeros(H), pi1=0.0046, pi2=7.3983, pi3=0.2055,
-             eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=50,
-             h=1E-4, tol=1E-8, noisy=True, H_U=None)
+def sir_macro(policy, sim_duraion=150, ctax_intensity=0.5, verbose=False):
 
-td2 = td_solve(ctax=np.full(H, .3), pr_treat=np.zeros(H), pr_vacc=np.full(H, 1/52), pi1=0.0046, pi2=7.3983, pi3=0.2055,
-             eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
-             h=1E-4, tol=1E-8, noisy=True, H_U=None)
+        ss = initial_ss() # pre-pandemic steady state
+        if verbose:
+                print('Steady state:', ss)
 
-vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop."},
-        {"key": "S", "name": "Susceptible", "y_unit": "% initial pop."},
-        {"key": "D", "name": "Death", "y_unit": "% initial pop."},
-        {"key": "T", "name": "New Infections", "y_unit": "% initial pop."},
-        {"key": "C", "name": "Aggregate Consumption", "y_unit": ""},
-        {"key": "N", "name": "Aggregate labor supply", "y_unit": ""},
-        ]
-plot_results_custom(td1, td2, name1='No Policy', name2 = 'Custom Policy', variables=vars, ss=ss, end_week = H, fig_name='./png/convoi.png', df1_name='./csv/convoi_td1.csv', df2_name='./csv/convoi_td2.csv')
+        ctax_policy = np.zeros(sim_duraion)
+        ctax_policy[policy['start_stayhome']:policy['end_stayhome']+1] = ctax_intensity 
+
+        # td1 = td_solve(ctax=np.full(sim_duraion, 0), pr_treat=np.zeros(sim_duraion), pr_vacc=np.zeros(sim_duraion), pi1=0.0046, pi2=7.3983, pi3=0.2055,
+        #         eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=50,
+        #         h=1E-4, tol=1E-8, noisy=False, H_U=None)
+
+        td2 = td_solve(ctax=ctax_policy, pr_treat=policy['treat'], pr_vacc=policy['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
+                eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
+                h=1E-4, tol=1E-8, noisy=verbose, H_U=None)
+
+        # td1 = pd.DataFrame(td1)
+        td2 = pd.DataFrame(td2)
+
+        # vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop."},
+        #         {"key": "S", "name": "Susceptible", "y_unit": "% initial pop."},
+        #         {"key": "D", "name": "Death", "y_unit": "% initial pop."},
+        #         {"key": "T", "name": "New Infections", "y_unit": "% initial pop."},
+        #         {"key": "C", "name": "Aggregate Consumption", "y_unit": ""},
+        #         {"key": "N", "name": "Aggregate labor supply", "y_unit": ""},
+        #         ]
+        # plot_results_custom(td1, td2, name1='No Policy', name2 = 'Custom Policy', variables=vars, ss=ss, end_week = sim_duraion, fig_name='./png/convoi.png', df1_name='./csv/convoi_td1.csv', df2_name='./csv/convoi_td2.csv')
+
+        print(type(td2))
+        print(td2)
+        print(td2["I"])
+
+        return td2
+
+def loss_sir_macro(td_res:DataFrame, covasim_res:DataFrame):
+        return np.square(td_res['I'] - covasim_res['I'])
+
+def find_containment():
+        gradient_descent(f=loss_sir_macro(), policy:dict, learning_rate=.01, num_iterations=1000, *args)
+
+
+def __main__():
+        sir_macro(sir_macro_policy)
+
+
+
+if __name__ == '__main__':
+    __main__()
+
 
 """
 ctax: Consumption tax (containment policy)

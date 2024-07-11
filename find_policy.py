@@ -22,78 +22,144 @@ def total_econ_loss(covasim_model, econ_model, policy):
     return cal_econ_daly(covasim_model, policy) + cal_gdp_loss(econ_model, policy)
 
 
-def gradient_descent(f:Callable, policy:dict, learning_rate=.01, num_iterations=1000, verbose=False):
+def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto', verbose=False, patience=100):
     """
-    This function is to estimate the gradient of a function f(x, y, z, ...) when the form of f() is unknown
+    This function estimates the gradient of a function f(x, y, z, ...) when the form of f() is unknown
     f: the loss function to be estimated the gradient of
-    x: the variable to which the gradient is estimated with respect to
+    policy: the dictionary of parameters to optimize
     learning_rate: the rate at which the gradient is updated
-    num_iterations: the number of iterations to update the gradient
+    epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
+    verbose: whether to print progress information
+    patience: number of epochs to wait for improvement before stopping (when epochs='auto')
     """
     policy_history = []  # Store the policy parameters at each epoch
     loss_history = []  # Store the loss at each epoch
-    for i in range(num_iterations):
+
+    print("Initial Policy:", policy)
+    print("Starting Gradient Descent...")
+
+    best_loss = float('inf')
+    epochs_without_improvement = 0
+    epoch = 0
+
+    while True:
         for parameter in policy.keys():
-            partial_derivative = partial_derivative_estimate(f, param_name = parameter, **policy)
+            partial_derivative = partial_derivative_estimate(f, param_name=parameter, **policy)
             policy[parameter] -= learning_rate * partial_derivative
+
+        current_loss = f(**policy)
         policy_history.append(policy.copy())
-        loss_history.append(f(**policy))
+        loss_history.append(current_loss)
+
         if verbose:
-            print(f'Iteration {i}: {policy}')
-            print(f'Loss: {f(**policy)}')
+            print(f'epoch {epoch}: {policy}')
+            print(f'Loss: {current_loss}')
+
+        # Check for improvement
+        if current_loss < best_loss:
+            best_loss = current_loss
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        # Stopping criterion
+        if epochs == 'auto':
+            if epochs_without_improvement >= patience:
+                print(f"Stopping: No improvement for {patience} epochs.")
+                break
+        elif epoch >= epochs - 1:  # -1 because epoch is 0-indexed
+            break
+
+        epoch += 1
 
     best_policy = policy_history[np.argmin(loss_history)]
+    print("Epochs ran:", epoch + 1)
+    print("Best policy:", best_policy)
+    print("Best loss:", np.min(loss_history))
     return best_policy, policy_history, loss_history
 
-def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, num_epochs=1000, **kwargs):
+def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100):
     """
     This function implements the gradient descent algorithm with Adam optimization to find the policy parameters that minimize the total economic loss.
     f: the loss function to be estimated the gradient of
-    policy: the variable to which the gradient is estimated with respect to
+    policy: the dictionary of parameters to optimize
     learning_rate: the rate at which the gradient is updated
     beta1, beta2: exponential decay rates for the moment estimates
     epsilon: small constant for numerical stability
-    num_epochs: the number of epochs to update the gradient
+    epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
+    verbose: whether to print progress information
+    patience: number of epochs to wait for improvement before stopping (when epochs='auto')
     """
     policy_history = []  # Store the policy parameters at each epoch
     loss_history = []  # Store the loss at each epoch
     m = {key: 0 for key in policy.keys()}  # Initialize 1st moment vector
     v = {key: 0 for key in policy.keys()}  # Initialize 2nd moment vector
 
-    for epoch in range(num_epochs):
-        for key, parameter in policy.items():
-            # Estimate the gradient for the entire dataset
-            gradient = partial_derivative_estimate(f, parameter, **kwargs)
+    print("Initial Policy", policy)
+    print("Starting Gradient Descent with Adam...")
+    
+    best_loss = float('inf')
+    epochs_without_improvement = 0
+    epoch = 0
+    
+    while True:
+        for param_name in policy.keys():
+            # Estimate the gradient for the current parameter
+            gradient = partial_derivative_estimate(f, param_name=param_name, **policy)
+            
             # Update biased first moment estimate
-            m[key] = beta1 * m[key] + (1 - beta1) * gradient
+            m[param_name] = beta1 * m[param_name] + (1 - beta1) * gradient
             # Update biased second raw moment estimate
-            v[key] = beta2 * v[key] + (1 - beta2) * (gradient ** 2)
+            v[param_name] = beta2 * v[param_name] + (1 - beta2) * (gradient ** 2)
             # Compute bias-corrected first moment estimate
-            m_hat = m[key] / (1 - beta1 ** (epoch + 1))
+            m_hat = m[param_name] / (1 - beta1 ** (epoch + 1))
             # Compute bias-corrected second raw moment estimate
-            v_hat = v[key] / (1 - beta2 ** (epoch + 1))
+            v_hat = v[param_name] / (1 - beta2 ** (epoch + 1))
             # Update the parameter
-            parameter = parameter - learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
-        print(f'Epoch {epoch}: {policy}')
-        print(f'Loss: {f(**kwargs)}')
+            policy[param_name] -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+        
+        current_loss = f(**policy)
+        if verbose:
+            print(f'Epoch {epoch}: {policy}')
+            print(f'Loss: {current_loss}')
         policy_history.append(policy.copy())
-        loss_history.append(f(**kwargs))
+        loss_history.append(current_loss)
+
+        # Check for improvement
+        if current_loss < best_loss:
+            best_loss = current_loss
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        # Stopping criterion
+        if epochs == 'auto':
+            if epochs_without_improvement >= patience:
+                print(f"Stopping: No improvement for {patience} epochs.")
+                break
+        elif epoch >= epochs - 1:  # -1 because epoch is 0-indexed
+            break
+
+        epoch += 1
 
     best_policy = policy_history[np.argmin(loss_history)]
+    print("Epochs ran:", epoch + 1)
+    print("Best policy:", best_policy)
+    print("Best loss:", np.min(loss_history))
     return best_policy, policy_history, loss_history
 
 
 def dummy_loss(j, y, k):
-    return k*j ** 2 + y ** 2
+    return (k**2 - j ** 2 + y ** 2)**2
 
 def main():
     # gradient_descent(total_econ_loss, policy)
-    policy = {'j': 2, 'y': 3, 'k': 8}
+    policy = {'j': 3, 'y': 5, 'k': 4}
 
-    best_policy, policy_history, loss_history = gradient_descent(dummy_loss, policy)
-    print("best policy", best_policy)
-    print("policy history", policy_history)
-    print("loss history", loss_history)
+    best_policy, policy_history, loss_history = gradient_descent(dummy_loss, policy, verbose=True, epochs='auto')
+    # print("best policy", best_policy)
+    # print("policy history", policy_history)
+    # print("loss history", loss_history)
 
 
 if __name__ == '__main__':

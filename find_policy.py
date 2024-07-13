@@ -1,6 +1,7 @@
 from daly import *
 from typing import Callable
 import numpy as np
+import json
 
 def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, **kwargs):
     """
@@ -9,6 +10,7 @@ def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, **kwargs):
     h: the infinitesimal change in x to estimate the derivative
     x: the variable to which the derivative is estimated with respect to
     """
+    # print("parital derivative is called!!!")
     kwargs_plus_h = kwargs.copy()
     kwargs_plus_h[param_name] += h
     return (f(**kwargs_plus_h) - f(**kwargs)) / h
@@ -22,7 +24,7 @@ def total_econ_loss(covasim_model, econ_model, policy):
     return cal_econ_daly(covasim_model, policy) + cal_gdp_loss(econ_model, policy)
 
 
-def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto', verbose=False, patience=100):
+def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto', verbose=False, patience=100, save_policy_as=None):
     """
     This function estimates the gradient of a function f(x, y, z, ...) when the form of f() is unknown
     f: the loss function to be estimated the gradient of
@@ -31,6 +33,7 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
     epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
     verbose: whether to print progress information
     patience: number of epochs to wait for improvement before stopping (when epochs='auto')
+    save_policy_as: the name of the file to save the best policy as a JSON object
     """
     policy_history = []  # Store the policy parameters at each epoch
     loss_history = []  # Store the loss at each epoch
@@ -44,10 +47,15 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
 
     while True:
         for parameter in policy.keys():
+            # print("parameter", parameter)
             partial_derivative = partial_derivative_estimate(f, param_name=parameter, **policy)
             policy[parameter] -= learning_rate * partial_derivative
+            # print("after update:", policy[parameter])
 
         current_loss = f(**policy)
+        if current_loss < 0:
+            print("Negative loss encountered in GD. Exiting...")
+            break
         policy_history.append(policy.copy())
         loss_history.append(current_loss)
 
@@ -76,9 +84,16 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
     print("Epochs ran:", epoch + 1)
     print("Best policy:", best_policy)
     print("Best loss:", np.min(loss_history))
+
+    # Convert and write JSON object to file
+    if save_policy_as:
+        with open("sample.json", "w") as outfile: 
+            json.dump(best_policy, outfile)
+        print(f"Best policy saved as {save_policy_as}")
+
     return best_policy, policy_history, loss_history
 
-def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100):
+def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100, save_policy_as=None):
     """
     This function implements the gradient descent algorithm with Adam optimization to find the policy parameters that minimize the total economic loss.
     f: the loss function to be estimated the gradient of
@@ -89,6 +104,7 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
     epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
     verbose: whether to print progress information
     patience: number of epochs to wait for improvement before stopping (when epochs='auto')
+    save_policy_as: the name of the file to save the best policy as a JSON object
     """
     policy_history = []  # Store the policy parameters at each epoch
     loss_history = []  # Store the loss at each epoch
@@ -119,6 +135,9 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
             policy[param_name] -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
         
         current_loss = f(**policy)
+        if current_loss < 0:
+            print("Negative loss encountered in GDwA. Exiting...")
+            break
         if verbose:
             print(f'Epoch {epoch}: {policy}')
             print(f'Loss: {current_loss}')
@@ -146,17 +165,24 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
     print("Epochs ran:", epoch + 1)
     print("Best policy:", best_policy)
     print("Best loss:", np.min(loss_history))
+
+    # Convert and write JSON object to file
+    if save_policy_as:
+        with open("sample.json", "w") as outfile: 
+            json.dump(best_policy, outfile)
+        print(f"Best policy saved as {save_policy_as}")
+
     return best_policy, policy_history, loss_history
 
 
 def dummy_loss(j, y, k):
-    return (k**2 - j ** 2 + y ** 2)**2
+    return (k**2 + j ** 2 + y ** 2)**2
 
 def main():
     # gradient_descent(total_econ_loss, policy)
     policy = {'j': 3, 'y': 5, 'k': 4}
 
-    best_policy, policy_history, loss_history = gradient_descent(dummy_loss, policy, verbose=True, epochs='auto')
+    best_policy, policy_history, loss_history = gradient_descent(dummy_loss, policy, verbose=True, epochs='auto', save_policy_as='sample.json')
     # print("best policy", best_policy)
     # print("policy history", policy_history)
     # print("loss history", loss_history)

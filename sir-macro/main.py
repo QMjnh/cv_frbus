@@ -191,11 +191,13 @@ def td_solve(ctax, pr_treat=np.zeros(250), pr_vacc=np.zeros(250), pi1=0.0046, pi
 
     # compute jacobian
     if H_U is None:
-        print('Precomputing Jacobian...')
+        if noisy:
+            print('Precomputing Jacobian...')
         J = get_J(ss=ss, ctax=ctax, pi1=pi1, pi2=pi2, pi3=pi3, H=H, eps=eps, pidbar=pidbar, pir=pir, phi=phi,
                   theta=theta, A=A, beta=beta, h=h, kappa=kappa, pr_treat=pr_treat, pr_vacc=pr_vacc)
         H_U = utils.J_to_HU(J, H, unknowns, targets)
-        print('Done!')
+        if noisy:
+            print('Done!')
 
     # initialize guess for unknowns to steady state length T
     Us = {k: np.full(H, ss[k]) for k in unknowns}

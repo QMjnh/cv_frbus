@@ -9,22 +9,6 @@ import sys
 sys.path.insert(0, '..')
 from find_policy import *
 
-sir_macro_policy = {
-        'start_stayhome': 5, # start stayhome at week 5
-        'end_stayhome': 7, # end stayhome at week 30
-        'ctax_intensity': 0.5
-}
-
-covasim_res = pd.DataFrame({'I': [0.00013] * 150})
-vax =  np.full(150, 1/52),
-treat =  np.zeros(150),
-
-medical_dict = {
-        'vax': vax,
-        'treat': treat, 
-        'covasim_res': covasim_res
-}
-
 class sir_macro():
         def __init__(self, medical_dict, start_stayhome, end_stayhome, sim_duraion=150, verbose=False):
                 self.medical_dict = medical_dict
@@ -40,7 +24,7 @@ class sir_macro():
                 #         print('Steady state:', ss)
                 ctax_policy = np.zeros(self.sim_duraion)
                 ctax_policy[self.start_stayhome:self.end_stayhome+1] = ctax_intensity 
-                td = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'][-1], pr_vacc=self.medical_dict['vax'][-1], pi1=0.0046, pi2=7.3983, pi3=0.2055,
+                td = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'], pr_vacc=self.medical_dict['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
                         eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
                         h=1E-4, tol=1E-8, noisy=False, H_U=None)
                 td = pd.DataFrame(td)
@@ -49,21 +33,28 @@ class sir_macro():
         def loss_sir_macro(self, ctax_intensity):
                 try:
                         td_res = self.sir_macro(ctax_intensity)
-                        loss = np.square(td_res['I'] - covasim_res['I']).sum()
+                        loss = np.square(td_res['I'] - self.medical_dict['covasim_res']['I']).sum()
                 except Exception as e:
                         print("sir-macro error:", e)
                         loss = -1
                 return loss
 
         def find_best_ctax(self, ctax_intensity):
-                best_policy, _, _ = gradient_descent_with_adam(self.loss_sir_macro, ctax_intensity, learning_rate=1,
+                best_policy, policy_history, loss_history = gradient_descent_with_adam(self.loss_sir_macro, ctax_intensity, learning_rate=1,
                                                          epochs='auto', verbose=self.verbose, patience=5, save_policy_as=None)
                 return best_policy
 
 
+
 def __main__():
+        
+        medical_dict = {
+                'vax': np.full(150, 1/52),
+                'treat': np.zeros(150), 
+                'covasim_res': pd.DataFrame({'I': [0.00013] * 150})
+        }
         sir = sir_macro(medical_dict, start_stayhome=5, end_stayhome=7, sim_duraion=150, verbose=True)
-        sir.find_best_ctax({'ctax_intensity': 0.5})
+        best_policy, policy_history, loss_history = sir.find_best_ctax({'ctax_intensity': 0.5})
 
 
 if __name__ == '__main__':

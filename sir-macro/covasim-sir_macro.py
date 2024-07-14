@@ -10,7 +10,7 @@ sys.path.insert(0, '..')
 from find_policy import *
 
 class sir_macro_obj():
-        def __init__(self, medical_dict, start_stayhome, end_stayhome, sim_duraion=150, verbose=False):
+        def __init__(self, medical_dict, start_stayhome, end_stayhome, epochs='auto', patience=5, learning_rate=.5, save_policy_as=None, sim_duraion=150, verbose=False):
                 self.medical_dict = medical_dict
                 self.start_stayhome = start_stayhome
                 self.end_stayhome = end_stayhome
@@ -19,13 +19,14 @@ class sir_macro_obj():
                 self.best_policy = None
                 self.policy_history = None
                 self.loss_history = None
-                self.ss = initial_ss() # pre-pandemic steady state
+                self.ss = initial_ss() # pre-pandemic steady state from sir-macro model
+                self.epochs = epochs
+                self.patience = patience
+                self.save_policy_as = save_policy_as
+                self.learning_rate = learning_rate
 
         def sir_macro(self, ctax_intensity):
-                # ss = initial_ss() 
-                # # if self.verbose:
-                # #         print('Steady state:', ss)
-                print("calling sir-macro")
+                # print("calling sir-macro")
                 ctax_policy = np.zeros(self.sim_duraion)
                 ctax_policy[self.start_stayhome:self.end_stayhome+1] = ctax_intensity 
                 td = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'], pr_vacc=self.medical_dict['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
@@ -35,7 +36,7 @@ class sir_macro_obj():
                 return td
 
         def loss_sir_macro(self, ctax_intensity):
-                print("calling loss_sir_macro")
+                # print("calling loss_sir_macro")
                 try:
                         td_res = self.sir_macro(ctax_intensity)
                         loss = np.square(td_res['I'] - self.medical_dict['covasim_res']['I']).sum()
@@ -45,9 +46,9 @@ class sir_macro_obj():
                 return loss
 
         def find_best_ctax(self, ctax_intensity):
-                print("find_best_ctax")
-                self.best_policy, self.policy_history, self.loss_history = gradient_descent_with_adam(self.loss_sir_macro, ctax_intensity, learning_rate=1,
-                                                         epochs=1, verbose=self.verbose, patience=5, save_policy_as=None)
+                # print("find_best_ctax")
+                self.best_policy, self.policy_history, self.loss_history = gradient_descent_with_adam(self.loss_sir_macro, ctax_intensity, learning_rate=self.learning_rate,
+                                                         epochs=self.epochs, verbose=self.verbose, patience=self.patience, save_policy_as=self.save_policy_as)
                 return self.best_policy, self.policy_history, self.loss_history
 
         def visualize(self):
@@ -72,12 +73,12 @@ class sir_macro_obj():
                              {'df': td2, 'name': 'Custom Policy', 'csv_name': './csv/td2.csv'},
                              {'df': self.medical_dict['covasim_res'], 'name': 'Covasim', 'csv_name': './csv/td0.csv'}]
 
-                vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop."},
+                vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop.",},
                         {"key": "S", "name": "Susceptible", "y_unit": "% initial pop."},
                         {"key": "D", "name": "Death", "y_unit": "% initial pop."},
                         {"key": "T", "name": "New Infections", "y_unit": "% initial pop."},
-                        {"key": "C", "name": "Aggregate Consumption", "y_unit": ""},
-                        {"key": "N", "name": "Aggregate labor supply", "y_unit": ""},
+                        {"key": "C", "name": "Aggregate Consumption", "y_unit": "% deviation from initial ss", 'type': '% deviation'},
+                        {"key": "N", "name": "Aggregate labor supply", "y_unit": "% deviation from initial. ss", 'type': '% deviation'},
                         ]
                 plot_results_custom(scenarios, variables=vars, ss=self.ss, end_week = self.sim_duraion, fig_name='./png/convoi.png')
 
@@ -89,9 +90,9 @@ def __main__():
         medical_dict = {
                 'vax': np.full(150, 1/52),
                 'treat': np.zeros(150), 
-                'covasim_res': pd.DataFrame({'I': [0.00013] * 150})
+                'covasim_res': pd.DataFrame({'I': [0.013] * 150})
         }
-        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=7, sim_duraion=150, verbose=True)
+        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=150, epochs=5, sim_duraion=150, verbose=True, learning_rate=0.2)
         best_policy, policy_history, loss_history = sir.find_best_ctax({'ctax_intensity': 0.5})
         sir.visualize()
 

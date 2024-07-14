@@ -151,11 +151,27 @@ def plot_results_custom(scenarios:[dict], ss, end_week, variables:[dict], fig_na
         ax[i].set_ylabel(variables[i]['y_unit'])
         ax[i].set_xlabel('weeks')
 
-        for j in range(len(scenarios)):
-            try:
-                ax[i].plot(100 * scenarios[j]['df'][variables[i]['key']][:end_week], label=scenarios[j]['name'], linewidth=2)
-            except Exception as e:
-                print(f"Error in plotting {scenarios[j]['name']}:", e, ". Skipping...")
+        try:
+            variables[i]['type']
+        except: 
+            variables[i]['type'] = '' 
+
+        if variables[i]['type'] == '% deviation':
+            for j in range(len(scenarios)):
+                ax[i].axhline(0, color='gray', linestyle='--')
+                try:
+                    ax[i].plot(100 * (scenarios[j]['df'][variables[i]['key']] / ss[variables[i]['key']]-1) [:end_week], label=scenarios[j]['name'], linewidth=2)
+                except Exception as e:
+                    print(f"Error in plotting {scenarios[j]['name']}:", e, ". Skipping...")
+
+
+        else:
+            for j in range(len(scenarios)):
+                try:
+                    ax[i].plot(100 * scenarios[j]['df'][variables[i]['key']][:end_week], label=scenarios[j]['name'], linewidth=2)
+                except Exception as e:
+                    print(f"Error in plotting {scenarios[j]['name']}:", e, ". Skipping...")
+
         ax[i].legend()
 
 

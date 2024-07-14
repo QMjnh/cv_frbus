@@ -119,7 +119,26 @@ def plot_results_default(td1, td2, name1, name2, ss, end_week, fig_name='./png/f
     plt.close()
 
 
-def plot_results_custom(td1, td2, name1, name2, ss, end_week, variables:[dict], fig_name='./png/fig1.png', df1_name='./csv/td1.csv', df2_name='./csv/td2.csv'):
+def plot_results_custom(scenarios:[dict], ss, end_week, variables:[dict], fig_name='./png/fig1.png'):
+    """
+    Plot results of custom pandemic scenarios.
+
+    Example Usage:
+    scenarios = [{'df': td1, 'name': 'No Policy', 'csv_name': './csv/td1.csv'},
+                {'df': td2, 'name': 'Custom Policy', 'csv_name': './csv/td2.csv'},
+                {'df': self.medical_dict['covasim_res'], 'name': 'Covasim', 'csv_name': './csv/td0.csv'}]
+
+    vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop."},
+            {"key": "S", "name": "Susceptible", "y_unit": "% initial pop."},
+            {"key": "D", "name": "Death", "y_unit": "% initial pop."},
+            {"key": "T", "name": "New Infections", "y_unit": "% initial pop."},
+            {"key": "C", "name": "Aggregate Consumption", "y_unit": ""},
+            {"key": "N", "name": "Aggregate labor supply", "y_unit": ""},
+            ]
+    plot_results_custom(scenarios, variables=vars, ss=self.ss, end_week = self.sim_duraion, fig_name='./png/convoi.png')
+    
+    """
+
     num_vars = len(variables)
     num_rows = math.ceil(num_vars / 3)  # Adjust as needed
     num_cols = 3
@@ -128,20 +147,22 @@ def plot_results_custom(td1, td2, name1, name2, ss, end_week, variables:[dict], 
     ax = axes.flatten()
 
     for i in range(len(variables)):
-        ax[i].plot(100 * td1[variables[i]['key']][:end_week], label=name1, linewidth=2)
-        ax[i].plot(100 * td2[variables[i]['key']][:end_week], label=name2, linewidth=2)
         ax[i].set_title(variables[i]['name'])
         ax[i].set_ylabel(variables[i]['y_unit'])
         ax[i].set_xlabel('weeks')
+
+        for j in range(len(scenarios)):
+            try:
+                ax[i].plot(100 * scenarios[j]['df'][variables[i]['key']][:end_week], label=scenarios[j]['name'], linewidth=2)
+            except Exception as e:
+                print(f"Error in plotting {scenarios[j]['name']}:", e, ". Skipping...")
         ax[i].legend()
 
 
+    for j in range(len(scenarios)):
+        scenarios[j]['df'].to_csv(scenarios[j]['csv_name'])
+
     plt.tight_layout()
-    
-    df1 = pd.DataFrame(td1)
-    df2 = pd.DataFrame(td2)
     plt.savefig(fig_name)
-    df1.to_csv(df1_name)
-    df2.to_csv(df2_name)
     plt.show()
     plt.close()

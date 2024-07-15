@@ -128,12 +128,13 @@ def plot_results_custom(scenarios:[dict], ss, end_week, variables:[dict], fig_na
                 {'df': td2, 'name': 'Custom Policy', 'csv_name': './csv/td2.csv'},
                 {'df': self.medical_dict['covasim_res'], 'name': 'Covasim', 'csv_name': './csv/td0.csv'}]
 
-    vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop."},
+
+    vars = [{"key": "I", "name": "Infected", "y_unit": "% initial pop.",},
             {"key": "S", "name": "Susceptible", "y_unit": "% initial pop."},
             {"key": "D", "name": "Death", "y_unit": "% initial pop."},
             {"key": "T", "name": "New Infections", "y_unit": "% initial pop."},
-            {"key": "C", "name": "Aggregate Consumption", "y_unit": ""},
-            {"key": "N", "name": "Aggregate labor supply", "y_unit": ""},
+            {"key": "C", "name": "Aggregate Consumption", "y_unit": "% deviation from initial ss", 'type': '% deviation'},
+            {"key": "N", "name": "Aggregate labor supply", "y_unit": "% deviation from initial. ss", 'type': '% deviation'},
             ]
     plot_results_custom(scenarios, variables=vars, ss=self.ss, end_week = self.sim_duraion, fig_name='./png/convoi.png')
     

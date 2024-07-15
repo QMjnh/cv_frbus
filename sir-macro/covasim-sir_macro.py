@@ -6,11 +6,13 @@ import pandas as pd
 from pandas import DataFrame
 from math import ceil
 import sys
+import time
 sys.path.insert(0, '..')
 from find_policy import *
+from find_policy_parallel import *
 
 class sir_macro_obj():
-        def __init__(self, medical_dict, start_stayhome, end_stayhome, epochs='auto', patience=5, learning_rate=.5, save_policy_as=None, sim_duraion=150, verbose=False):
+        def __init__(self, medical_dict, start_stayhome, end_stayhome, epochs='auto', patience=5, learning_rate=.5, save_policy_as=None, sim_duraion=150, verbose=False, fig_name='./png/convoi2.png'):
                 self.medical_dict = medical_dict
                 self.start_stayhome = start_stayhome
                 self.end_stayhome = end_stayhome
@@ -24,11 +26,17 @@ class sir_macro_obj():
                 self.patience = patience
                 self.save_policy_as = save_policy_as
                 self.learning_rate = learning_rate
+                self.fig_name = fig_name
 
         def sir_macro(self, ctax_intensity):
-                # print("calling sir-macro")
-                ctax_policy = np.zeros(self.sim_duraion)
-                ctax_policy[self.start_stayhome:self.end_stayhome+1] = ctax_intensity 
+                print("calling sir-macro")
+                if not isinstance(ctax_intensity, pd.Series) :
+                        ctax_policy = np.zeros(self.sim_duraion)
+                        ctax_policy[self.start_stayhome:self.end_stayhome+1] = ctax_intensity 
+
+                else: ctax_policy = ctax_intensity 
+
+
                 td = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'], pr_vacc=self.medical_dict['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
                         eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
                         h=1E-4, tol=1E-8, noisy=False, H_U=None)
@@ -36,7 +44,7 @@ class sir_macro_obj():
                 return td
 
         def loss_sir_macro(self, ctax_intensity):
-                # print("calling loss_sir_macro")
+                print("calling loss_sir_macro")
                 try:
                         td_res = self.sir_macro(ctax_intensity)
                         loss = np.square(td_res['I'] - self.medical_dict['covasim_res']['I']).sum()
@@ -46,8 +54,14 @@ class sir_macro_obj():
                 return loss
 
         def find_best_ctax(self, ctax_intensity):
-                # print("find_best_ctax")
+                print("find_best_ctax")
                 self.best_policy, self.policy_history, self.loss_history = gradient_descent_with_adam(self.loss_sir_macro, ctax_intensity, learning_rate=self.learning_rate,
+                                                         epochs=self.epochs, verbose=self.verbose, patience=self.patience, save_policy_as=self.save_policy_as)
+                return self.best_policy, self.policy_history, self.loss_history
+
+        def find_best_ctax_parallel(self, ctax_intensity):
+                print("find_best_ctax_parallel")
+                self.best_policy, self.policy_history, self.loss_history = gradient_descent_adam_parallel(self.loss_sir_macro, ctax_intensity, learning_rate=self.learning_rate,
                                                          epochs=self.epochs, verbose=self.verbose, patience=self.patience, save_policy_as=self.save_policy_as)
                 return self.best_policy, self.policy_history, self.loss_history
 
@@ -59,8 +73,12 @@ class sir_macro_obj():
                         h=1E-4, tol=1E-8, noisy=False, H_U=None)
 
 
-                ctax_policy = np.zeros(self.sim_duraion)
-                ctax_policy[self.start_stayhome:self.end_stayhome+1] = self.best_policy['ctax_intensity'] 
+                if not isinstance(self.best_policy['ctax_intensity'], pd.core.series.Series) :
+                        print(type(self.best_policy['ctax_intensity']))
+                        ctax_policy = np.zeros(self.sim_duraion)
+                        ctax_policy[self.start_stayhome:self.end_stayhome+1] = self.best_policy['ctax_intensity']
+
+                else: ctax_policy = self.best_policy['ctax_intensity']
 
                 td2 = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'], pr_vacc=self.medical_dict['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
                         eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
@@ -80,7 +98,7 @@ class sir_macro_obj():
                         {"key": "C", "name": "Aggregate Consumption", "y_unit": "% deviation from initial ss", 'type': '% deviation'},
                         {"key": "N", "name": "Aggregate labor supply", "y_unit": "% deviation from initial. ss", 'type': '% deviation'},
                         ]
-                plot_results_custom(scenarios, variables=vars, ss=self.ss, end_week = self.sim_duraion, fig_name='./png/convoi.png')
+                plot_results_custom(scenarios, variables=vars, ss=self.ss, end_week = self.sim_duraion, fig_name=self.fig_name)
 
 
 
@@ -92,8 +110,25 @@ def __main__():
                 'treat': np.zeros(150), 
                 'covasim_res': pd.DataFrame({'I': [0.013] * 150})
         }
-        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=150, epochs=5, sim_duraion=150, verbose=True, learning_rate=0.2)
+        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=150, epochs=1, sim_duraion=150, verbose=True, learning_rate=0.2)
+        start_time = time.time()
         best_policy, policy_history, loss_history = sir.find_best_ctax({'ctax_intensity': 0.5})
+        print("Time taken sigular:", time.time() - start_time)
+        sir.visualize()
+
+
+
+
+
+        medical_dict = {
+                'vax': np.full(150, 1/52),
+                'treat': np.zeros(150), 
+                'covasim_res': pd.DataFrame({'I': [0.013] * 150})
+        }
+        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=150, epochs=1, sim_duraion=150, verbose=False, learning_rate=0.2, fig_name='./png/convoi2_parallel.png')
+        start_time = time.time()
+        best_policy, policy_history, loss_history = sir.find_best_ctax_parallel({'ctax_intensity': pd.Series(np.full(150, 0.5))})
+        print("Time taken parallel:", time.time() - start_time)
         sir.visualize()
 
 if __name__ == '__main__':

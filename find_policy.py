@@ -114,7 +114,7 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
     
     while True:
         for param_name in policy.keys():
-            print("param_name", param_name)
+            # print("param_name", param_name)
             # Estimate the gradient for the current parameter
             gradient, current_loss = partial_derivative_estimate(f, param_name=param_name, **policy)
             

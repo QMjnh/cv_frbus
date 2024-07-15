@@ -1,9 +1,10 @@
 1. No interventions:
-- beta: 0.1
-- death_prop: 2.0
+- beta: 0.13
+- death_prop: 2.67
 
 2. Lockdown (50%) - no vaccine:
-
+- beta: 0.06
+- death_prob: 1.18
 
 
 

@@ -1,3 +1,13 @@
+1. No interventions:
+- beta: 0.1
+- death_prop: 2.0
+
+2. Lockdown (50%) - no vaccine:
+
+
+
+
+
 Download the epidemiology.csv file from https://health.google.com/covid-19/open-data/
 
 For calibration to run, go to analysis.py in the covasim package and edit the remove_db function:

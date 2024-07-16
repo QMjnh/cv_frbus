@@ -1,14 +1,17 @@
-1. No interventions:
-- beta: 0.13
-- death_prop: 2.67
+1. Dependencies:
+! pip install covasim
+! pip install optuna
+! pip install pycountry
+! pip install seaborn
+! pip install plotly
 
-2. Lockdown (50%) - no vaccine:
-- beta: 0.06
-- death_prob: 1.18
+2. Pipline:
+- Download and clean epidemiology data (our population)
+- Calibrate to optimize intial parameters for simulation (calibration.py)
+- Simulation with interventions including lockdown, testing, contact tracing, and vaccination based on real scenarios in the US (simulations.py)
+- Output: 2 csv files with and without interventions
 
-
-
-
+3. Other notes:
 Download the epidemiology.csv file from https://health.google.com/covid-19/open-data/
 
 For calibration to run, go to analysis.py in the covasim package and edit the remove_db function:

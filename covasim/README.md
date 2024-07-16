@@ -13,6 +13,7 @@ pip install plotly
 - Simulation with interventions including lockdown, testing, contact tracing, and vaccination based on real scenarios in the US (simulations.py)
 - Output: 2 csv files with and without interventions
 
+
 **3. Other notes:**
 
 Download the epidemiology.csv file from https://health.google.com/covid-19/open-data/

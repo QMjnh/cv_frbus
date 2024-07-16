@@ -4,8 +4,8 @@
 pip install covasim pandas sciris
 ```
 **2. Pipline:**
-- Download and clean epidemiology data (our population)
-- Calibrate to optimize intial parameters for simulation (calibration.py)
+- Download epidemiology data (our population)
+- Load, clean epidemilogy data, and calibrate to optimize intial parameters for simulation (calibration.py)
 - Simulation with interventions including lockdown, testing, contact tracing, and vaccination based on real scenarios in the US (simulations.py)
 - Output: 2 csv files with and without interventions
 

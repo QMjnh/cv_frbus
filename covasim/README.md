@@ -1,21 +1,25 @@
-1. Dependencies:
-! pip install covasim
-! pip install optuna
-! pip install pycountry
-! pip install seaborn
-! pip install plotly
+**1. Dependencies:**
 
-2. Pipline:
+```sh
+pip install covasim
+pip install optuna
+pip install pycountry
+pip install seaborn
+pip install plotly
+```
+**2. Pipline:**
 - Download and clean epidemiology data (our population)
 - Calibrate to optimize intial parameters for simulation (calibration.py)
 - Simulation with interventions including lockdown, testing, contact tracing, and vaccination based on real scenarios in the US (simulations.py)
 - Output: 2 csv files with and without interventions
 
-3. Other notes:
+**3. Other notes:**
+
 Download the epidemiology.csv file from https://health.google.com/covid-19/open-data/
 
 For calibration to run, go to analysis.py in the covasim package and edit the remove_db function:
 
+```sh
 def remove_db(self):
         '''
         Remove the database file if keep_db is false and the path exists.
@@ -54,3 +58,4 @@ def remove_db(self):
                     proc.wait() 
                     print(f'Terminated process {proc.info["name"]} (PID: {proc.info["pid"]}).')
         return
+```

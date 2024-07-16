@@ -1,11 +1,7 @@
 **1. Dependencies:**
 
 ```sh
-pip install covasim
-pip install optuna
-pip install pycountry
-pip install seaborn
-pip install plotly
+pip install covasim pandas sciris
 ```
 **2. Pipline:**
 - Download and clean epidemiology data (our population)

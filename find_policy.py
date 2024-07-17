@@ -15,6 +15,7 @@ def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, **kwargs):
     kwargs_plus_h[param_name] += h
     loss = f(**kwargs)
     derivative = (f(**kwargs_plus_h) - loss) / h 
+    print("derivative", derivative)
     return derivative, loss
 
 
@@ -43,6 +44,7 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
         for parameter in policy.keys():
             # print("parameter", parameter)
             partial_derivative, current_loss = partial_derivative_estimate(f, param_name=parameter, **policy)
+            print("delta", learning_rate * partial_derivative)
             policy[parameter] -= learning_rate * partial_derivative
             # print("after update:", policy[parameter])
 
@@ -81,7 +83,7 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
 
     # Convert and write JSON object to file
     if save_policy_as:
-        with open("sample.json", "w") as outfile: 
+        with open(save_policy_as, "w") as outfile: 
             json.dump(best_policy, outfile)
         print(f"Best policy saved as {save_policy_as}")
 
@@ -163,7 +165,7 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
 
     # Convert and write JSON object to file
     if save_policy_as:
-        with open("sample.json", "w") as outfile: 
+        with open(save_policy_as, "w") as outfile: 
             json.dump(best_policy, outfile)
         print(f"Best policy saved as {save_policy_as}")
 
@@ -268,7 +270,7 @@ class GD():
 
         # Convert and write JSON object to file
         if self.save_policy_as:
-            with open("sample.json", "w") as outfile: 
+            with open(save_policy_as, "w") as outfile: 
                 json.dump(self.best_policy, outfile)
             print(f"Best policy saved as {self.save_policy_as}")
 

@@ -11,7 +11,7 @@ data = load_data("../data/HISTDATA.TXT")
 frbus = Frbus("../models/model.xml")
 
 # Define start and end periods
-start = pd.Period("2019Q4")
+start = "2019Q4"
 end = "2023Q4"
 
 ############### Solve for no pandemic scenario ###############
@@ -20,10 +20,10 @@ no_pandemic = frbus.solve(start, end, data)
 
 ############### Create no stay-at-home orders scenario ###############
 no_stayhome_data = no_pandemic.copy(deep=True)
-no_stayhome_data = frbus.init_trac(start, end, no_stayhome_data)
+no_stayhome_data = frbus.init_trac(start, end, data)
 
 # Load model variables
-variables = pd.read_csv("model_variables_simple.csv")
+variables = pd.read_csv("./model architecture/model_variables_simple.csv")
 dynamic_variables = variables[(variables["sector"] == "Labor Market") | (variables["sector"] == "Household Expenditures")
                             | (variables["sector"] == "Aggregate Output Identities")].name
 
@@ -33,12 +33,12 @@ for name in dynamic_variables:
     try:
         no_stayhome_data[f"{name}_trac"] = np.zeros(len(no_stayhome_data))
     except Exception as e:
-        print(f"Can't trac variable '{name}', exception message: {e}")
+        print(f"Can't untrac variable '{name}', exception message: {e}")
 
 # Adjust unemployment rates for stay-at-home orders
 stay_home_total = 17  # weeks
-start_stayhome = pd.Period("2020Q2")
-end_stayhome = pd.Period("2020Q2")
+start_stayhome = "2020Q2"
+end_stayhome = "2020Q2"
 
 no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1 - .019)**stay_home_total
 no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_t"] = data.loc[start_stayhome:end_stayhome, 'lur'] * (1 - .019)**stay_home_total
@@ -52,7 +52,7 @@ inst_no_stayhome += ['lur', 'lurnat']
 
 # Run mcontrol to match the target variables to their trajectories
 no_stayhome = frbus.mcontrol(start, end, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
-no_stayhome = frbus.solve(start, end, no_stayhome_data)
+no_stayhome = frbus.solve(start, end, no_stayhome)
 
 # Adjust for anticipated errors during stay-at-home period
 stayhome_aerr_data = no_stayhome.copy(deep=True)

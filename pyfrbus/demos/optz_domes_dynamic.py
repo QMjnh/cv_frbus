@@ -19,7 +19,6 @@ no_pandemic = frbus.solve(start, end, data)
 
 
 ############### Create no stay-at-home orders scenario ###############
-no_stayhome_data = no_pandemic.copy(deep=True)
 no_stayhome_data = frbus.init_trac(start, end, data)
 
 # Load model variables

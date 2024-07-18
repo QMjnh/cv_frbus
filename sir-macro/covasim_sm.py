@@ -12,7 +12,7 @@ from find_policy import *
 from find_policy_parallel import *
 
 class sir_macro_obj():
-        def __init__(self, medical_dict, start_stayhome, end_stayhome, epochs='auto', patience=5, learning_rate=.5, save_policy_as=None, sim_duraion=150, verbose=False, fig_name='./png/convoi2.png'):
+        def __init__(self, medical_dict, start_stayhome, end_stayhome, epochs='auto', patience=5, learning_rate=.5, save_policy_as=None, sim_duraion=208, verbose=False, fig_name='./png/convoi2.png'):
                 self.medical_dict = medical_dict
                 self.start_stayhome = start_stayhome
                 self.end_stayhome = end_stayhome
@@ -89,9 +89,11 @@ class sir_macro_obj():
 
                 else: ctax_policy = self.best_policy['ctax_intensity']
 
-                td2 = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'], pr_vacc=self.medical_dict['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
-                        eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
-                        h=1E-4, tol=1E-8, noisy=False, H_U=None)
+                # td2 = td_solve(ctax=ctax_policy, pr_treat=self.medical_dict['treat'], pr_vacc=self.medical_dict['vax'], pi1=0.0046, pi2=7.3983, pi3=0.2055,
+                #         eps=0.001, pidbar=0.07 / 18, pir=0.99 * 7 / 18, kappa=0.0, phi=0.8, theta=36, A=39.8, beta=0.96**(1/52), maxit=100,
+                #         h=1E-4, tol=1E-8, noisy=False, H_U=None)
+
+                td2 = self.best_simulation()
 
                 td1 = pd.DataFrame(td1)
                 td2 = pd.DataFrame(td2)
@@ -122,23 +124,23 @@ def __main__():
         covasim_df['T'] = covasim_df['new_infections'] / simulated_pop
         covasim_df['S'] = covasim_df['n_susceptible'] / simulated_pop
 
-        # Generate 150 points from a normal distribution
-        x = np.linspace(norm.ppf(0.01), norm.ppf(0.99), 150)
+        # Generate 208 points from a normal distribution
+        x = np.linspace(norm.ppf(0.01), norm.ppf(0.99), 208)
         # Calculate the PDF of the normal distribution at these points
         pdf_values = norm.pdf(x)
         covasim_df = pd.DataFrame(pdf_values/10, columns=['I'])
         # print("max", max(covasim_df['I']))
 
         medical_dict = {
-                'vax': np.full(150, 1/52),
-                'treat': np.zeros(150), 
+                'vax': np.full(208, 1/52),
+                'treat': np.zeros(208), 
                 'covasim_res': covasim_df
         }
-        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=150, epochs=1, sim_duraion=150, verbose=True, learning_rate=0.3, save_policy_as='./json/sample.json')
+        sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=208, epochs=1, sim_duraion=208, verbose=True, learning_rate=0.3, save_policy_as='./json/sample.json')
         start_time = time.time()
         best_policy, policy_history, loss_history = sir.find_best_ctax({'ctax_intensity': 0.5})
         # print("Time taken sigular:", time.time() - start_time)
-        # sir.visualize()
+        sir.visualize()
 
         sir_res = sir.best_simulation()
 
@@ -147,13 +149,13 @@ def __main__():
 
 
         # medical_dict = {
-        #         'vax': np.full(150, 1/52),
-        #         'treat': np.zeros(150), 
-        #         'covasim_res': pd.DataFrame({'I': [0.013] * 150})
+        #         'vax': np.full(208, 1/52),
+        #         'treat': np.zeros(208), 
+        #         'covasim_res': pd.DataFrame({'I': [0.013] * 208})
         # }
-        # sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=150, epochs=1, sim_duraion=150, verbose=False, learning_rate=0.2, fig_name='./png/convoi2_parallel.png')
+        # sir = sir_macro_obj(medical_dict, start_stayhome=5, end_stayhome=208, epochs=1, sim_duraion=208, verbose=False, learning_rate=0.2, fig_name='./png/convoi2_parallel.png')
         # start_time = time.time()
-        # best_policy, policy_history, loss_history = sir.find_best_ctax_parallel({'ctax_intensity': pd.Series(np.full(150, 0.5))})
+        # best_policy, policy_history, loss_history = sir.find_best_ctax_parallel({'ctax_intensity': pd.Series(np.full(208, 0.5))})
         # print("Time taken parallel:", time.time() - start_time)
         # sir.visualize()
 

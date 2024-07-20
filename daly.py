@@ -10,7 +10,7 @@ Original file is located at
 <p align='center'><img src='https://drive.google.com/uc?export=view&id=1VSPOvi0anGYSLnt4JaqwK1fiD7B4O3X7' alt='Compartment flowchart' height='400px' width='2500px'></p>
 """
 
-def cal_yld(num_infected):
+def cal_yld(num_infected, weights='default'):
   # Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
 
   # Default disability weights for COVID-19 states
@@ -83,6 +83,6 @@ def cal_daly(num_infected, num_death):
   daly = cal_yld(num_infected) + cal_yll(num_death)
   return daly
 
-def cal_econ_daly(covasim_model, policy:dict, price_per_daly=95075):
-  num_infected, num_death = covasim_model(policy)
+def cal_econ_daly(covasim_result_df, price_per_daly=95075):
+  num_infected, num_death = covasim_result_df['I'].sum(), covasim_result_df['D'].sum()
   return cal_daly(num_infected, num_death) * price_per_daly

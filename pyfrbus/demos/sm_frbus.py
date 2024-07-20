@@ -8,11 +8,11 @@ class sm_frbus():
     def __init__(self, start="2019Q4", end="2023Q4",
                  no_pandemic=None, no_stayhome=None,
                  model_path="../models/model.xml", data_path="../data/HISTDATA.TXT"):
-        self.data = load_data("../data/HISTDATA.TXT")
-        self.model = Frbus("../models/model.xml")
+        self.data = load_data("/home/mlq/fed model/pyfrbus/data/HISTDATA.TXT")
+        self.model = Frbus("/home/mlq/fed model/pyfrbus/models/model.xml")
         self.start = start
         self.end = end
-        self.variables = pd.read_csv("./model architecture/model_variables_simple.csv")
+        self.variables = pd.read_csv("/home/mlq/fed model/pyfrbus/demos/model architecture/model_variables_simple.csv")
         self.dynamic_variables = self.variables[(self.variables["sector"] == "Labor Market") | (self.variables["sector"] == "Household Expenditures")
                             | (self.variables["sector"] == "Aggregate Output Identities")].name
 
@@ -90,7 +90,7 @@ class sm_frbus():
         traj_custom += ['lur_t', 'lurnat_t']
         inst_custom += ['lur', 'lurnat']
 
-        print("traj",traj_custom)
+        # print("traj",traj_custom)
 
         if custom_stayhome_data is None:
             print("No custom stayhome data provided. Using default values.")
@@ -144,6 +144,11 @@ class sm_frbus():
 
         return custom_stayhome_data, targ_custom, traj_custom, inst_custom
 
+    def loss_econ(self):
+        if self.custom_stayhome is None:
+            raise Exception("No custom stayhome scenario has been solved yet. Please run solve_custom_stayhome() first.")
+        return (self.custom_stayhome['xgdp'] - self.no_stayhome['xgdp']).sum()
+
     def save_results(self, path="./results/dynamic_labor_consumption/"):
         if self.no_pandemic is None or self.no_stayhome is None or self.custom_stayhome is None:
             raise Exception("No scenarios have been solved yet. Please run solve_no_pandemic(), solve_no_stayhome() and solve_custom_stayhome() first.")
@@ -161,7 +166,7 @@ class sm_frbus():
             {'column': 'ec', 'name': 'Consumption, cw 2012$'},
             {'column': 'pcpi', 'type': 'pct_change', 'name': 'CPI'}
         ]
-        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, './results/dynamic_labor_consumption/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')
+        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')
 
         plots = [
             {'column': 'lprdt'},
@@ -169,7 +174,7 @@ class sm_frbus():
             {'column': 'lww', 'name': 'Workweek, business sector'},
             {'column': 'lqualt'}
         ]
-        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, './results/dynamic_labor_consumption/labor quality.png', plot_title='No April lockdown + same foreign variables')
+        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/labor quality.png', plot_title='No April lockdown + same foreign variables')
 
         plots = [
             {'column': 'leg', 'name': 'Gov. civilian employment'},
@@ -177,7 +182,7 @@ class sm_frbus():
             {'column': 'lurnat'},
             {'column': 'leh'}
         ]
-        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, './results/dynamic_labor_consumption/(un)employment.png', plot_title='No April lockdown + same foreign variables')
+        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/(un)employment.png', plot_title='No April lockdown + same foreign variables')
 
         plots = [
             {'column': 'ex', 'name': 'Export, cw 2012$'},
@@ -185,15 +190,20 @@ class sm_frbus():
             {'column': 'fpic', 'name': 'Foreign CPI (G39)'},
             {'column': 'fgdp', 'name': 'Foreign GDP (G39)'}
         ]
-        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, './results/dynamic_labor_consumption/export+import.png', plot_title='No April lockdown + same foreign variables')
+        custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/export+import.png', plot_title='No April lockdown + same foreign variables')
 
 
+def main():
+    obj = sm_frbus()
+    sm_df = pd.read_csv("../../sir_macro/csv/td2.csv")
+    custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(sm_df)
+    obj.solve_custom_stayhome(start_lockdown_opt="2020Q2", end_lockdown_opt="2020Q2", custom_lockdown_duration=17,
+                                custom_stayhome_data=custom_stayhome_data,
+                                targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
 
-obj = sm_frbus()
-sm_df = pd.read_csv("../../sir-macro/csv/td2.csv")
-custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(sm_df)
-obj.solve_custom_stayhome(start_lockdown_opt="2020Q2", end_lockdown_opt="2020Q2", custom_lockdown_duration=17,
-                             custom_stayhome_data=custom_stayhome_data,
-                             targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
+    obj.plot_results()
+    loss = obj.loss_econ() 
+    print(loss)
 
-obj.plot_results()
+if __name__ == "__main__":
+    main()

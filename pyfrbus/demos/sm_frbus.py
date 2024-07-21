@@ -12,6 +12,7 @@ class sm_frbus():
         self.model = Frbus("/home/mlq/fed model/pyfrbus/models/model.xml")
         self.start = start
         self.end = end
+        self.real_stayhome = 8 # weeks that the stay-at-home orders is in effect in real life
         self.variables = pd.read_csv("/home/mlq/fed model/pyfrbus/demos/model architecture/model_variables_simple.csv")
         self.dynamic_variables = self.variables[(self.variables["sector"] == "Labor Market") | (self.variables["sector"] == "Household Expenditures")
                             | (self.variables["sector"] == "Aggregate Output Identities")].name
@@ -36,40 +37,42 @@ class sm_frbus():
 
         return dummy
 
-    def solve_no_stayhome(self, stay_home_total=17, start_stayhome="2020Q2", end_stayhome="2020Q2"):
+    def solve_no_stayhome(self, start_stayhome=pd.Period("2020Q2"), end_stayhome=pd.Period("2020Q2")):
         print("Creating no stay-at-home orders scenario...")
-        stay_home_total = stay_home_total  # weeks
+
         start_stayhome = start_stayhome
         end_stayhome = end_stayhome
         targ_no_stayhome, traj_no_stayhome, inst_no_stayhome = [], [], []
 
         no_stayhome_data = self.trac_non_dynamic_variables()
         # Adjust unemployment rates for stay-at-home orders
-        no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = self.data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1 - .019)**stay_home_total
-        no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_t"] = self.data.loc[start_stayhome:end_stayhome, 'lur'] * (1 - .019)**stay_home_total
+        no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = self.data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1 - .019)**self.real_stayhome
+        no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_t"] = self.data.loc[start_stayhome:end_stayhome, 'lur'] * (1 - .019)**self.real_stayhome
+
+        no_stayhome_data.loc[end_stayhome+1:self.end, "lurnat_t"] = self.data.loc[end_stayhome+1:self.end, 'lurnat']
+        no_stayhome_data.loc[end_stayhome+1:self.end , "lur_t"] = self.data.loc[end_stayhome+1:self.end, 'lur']
         # Update target and trajectory lists
         targ_no_stayhome += ['lur', 'lurnat']
         traj_no_stayhome += ['lur_t', 'lurnat_t']
         inst_no_stayhome += ['lur', 'lurnat']
 
         # Run mcontrol to match the target variables to their trajectories
-        no_stayhome_result = self.model.mcontrol(self.start, self.end, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
-        no_stayhome_result = self.model.solve(self.start, self.end, no_stayhome_result)
-        no_stayhome_result = self.model.mcontrol(self.start, self.end, no_stayhome_result, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
+        no_stayhome_result = self.model.mcontrol(start_stayhome, end_stayhome, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
+        no_stayhome_result = self.model.solve(end_stayhome+1, self.end, no_stayhome_result)
+        no_stayhome_result = self.model.mcontrol(end_stayhome+1, self.end, no_stayhome_result, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
 
         return no_stayhome_result
 
-    def cal_stayhome_anticipated_errors(self, stay_home_total=17, start_stayhome="2020Q2", end_stayhome="2020Q2"):
+    def cal_stayhome_anticipated_errors(self, start_stayhome=pd.Period("2020Q2"), end_stayhome=pd.Period("2020Q2")):
         if self.no_stayhome is None:
             raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
         stayhome_aerr_data = self.no_stayhome.copy(deep=True)
 
-        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "lur_t"] = stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'lur'] * (1.019**stay_home_total)
-        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1.019**stay_home_total)
+        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "lur_t"] = stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'lur'] * (1.019**self.real_stayhome)
+        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1.019**self.real_stayhome)
 
         stayhome_aerr = self.model.mcontrol(start_stayhome, end_stayhome, stayhome_aerr_data, ['lur', 'lurnat'], ['lur_t', 'lurnat_t'], ['lur', 'lurnat'])
-        stayhome_aerr = self.model.solve(end_stayhome, self.end, stayhome_aerr)
-        stayhome_aerr = self.model.mcontrol(end_stayhome, self.end, stayhome_aerr, ['lur', 'lurnat'], ['lur_t', 'lurnat_t'], ['lur', 'lurnat'])
+        stayhome_aerr = self.model.solve(end_stayhome+1, self.end, stayhome_aerr)
 
         # Calculate errors for each variable
         for name in self.variables['name']:
@@ -80,7 +83,7 @@ class sm_frbus():
 
         return stayhome_aerr
 
-    def solve_custom_stayhome(self, start_lockdown_opt="2020Q2", end_lockdown_opt="2020Q2", custom_lockdown_duration=17,
+    def solve_custom_stayhome(self, start_lockdown_opt=pd.Period("2020Q2"), end_lockdown_opt=pd.Period("2020Q2"), custom_lockdown_duration=17,
                              targ_custom=None, traj_custom=None, inst_custom=None, custom_stayhome_data=None):
         if not targ_custom or not traj_custom or not inst_custom:
             print("No custom targets, trajectories and instruments provided. Using default empty values.")
@@ -89,8 +92,6 @@ class sm_frbus():
         targ_custom += ['lur', 'lurnat']
         traj_custom += ['lur_t', 'lurnat_t']
         inst_custom += ['lur', 'lurnat']
-
-        # print("traj",traj_custom)
 
         if custom_stayhome_data is None:
             print("No custom stayhome data provided. Using default values.")
@@ -102,9 +103,7 @@ class sm_frbus():
         custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, "lurnat_t"] = custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, 'lurnat'] * (1.019**custom_lockdown_duration)
 
         custom_stayhome = self.model.mcontrol(start_lockdown_opt, end_lockdown_opt, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
-        custom_stayhome = self.model.solve(end_lockdown_opt, self.end, custom_stayhome)
-        # custom_stayhome = self.model.mcontrol(end_lockdown_opt, self.end, custom_stayhome, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
-        custom_stayhome = self.model.mcontrol(start_lockdown_opt, end_lockdown_opt, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
+        custom_stayhome = self.model.solve(end_lockdown_opt+1, self.end, custom_stayhome)
 
         # Apply anticipated errors
         for name in self.variables['name']:
@@ -128,7 +127,7 @@ class sm_frbus():
         df['group'] = df.index // group_size
         # Calculate the mean of each group
         df_quarter = df.groupby('group').mean()
-        df_quarter.index = pd.period_range(start='2020Q1', periods=len(df_quarter), freq='Q') # Set the index to quarters to match the FRB/US model
+        df_quarter.index = pd.period_range(start=pd.Period('2020Q1'), periods=len(df_quarter), freq='Q') # Set the index to quarters to match the FRB/US model
 
         targ_custom = ['ec', 'lhp']
         traj_custom = ['ec_t', 'lhp_t']
@@ -197,7 +196,7 @@ def main():
     obj = sm_frbus()
     sm_df = pd.read_csv("../../sir_macro/csv/td2.csv")
     custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(sm_df)
-    obj.solve_custom_stayhome(start_lockdown_opt="2020Q2", end_lockdown_opt="2020Q2", custom_lockdown_duration=17,
+    obj.solve_custom_stayhome(start_lockdown_opt=pd.Period("2020Q2"), end_lockdown_opt=pd.Period("2020Q2"), custom_lockdown_duration=8,
                                 custom_stayhome_data=custom_stayhome_data,
                                 targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
 

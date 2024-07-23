@@ -17,11 +17,11 @@ class sm_frbus():
         self.dynamic_variables = self.variables[(self.variables["sector"] == "Labor Market") | (self.variables["sector"] == "Household Expenditures")
                             | (self.variables["sector"] == "Aggregate Output Identities")].name
 
+        self.control = None 
         self.no_pandemic = self.solve_no_pandemic()
         self.no_stayhome = self.solve_no_stayhome()
         self.stayhome_anticipated_errors = self.cal_stayhome_anticipated_errors()
         self.custom_stayhome = None
-
     def solve_no_pandemic(self):
         print("Solving for no pandemic scenario...")
         result = self.model.solve(self.start, self.end, self.data)
@@ -37,61 +37,158 @@ class sm_frbus():
 
         return dummy
 
-    def solve_no_stayhome(self, start_stayhome=pd.Period("2020Q2"), end_stayhome=pd.Period("2020Q2")):
+    def week_to_quarter(self, week):
+        # Create a date range starting from the beginning of 2020
+        date_range = pd.date_range(start='2020-01-01', periods=week, freq='W')
+        # Get the last date in the range
+        end_date = date_range[-1]
+        return end_date.to_period('Q')
+
+    def calculate_weekly_values(self, start_value_leh, lf, bool_values):
+        # Convert bool_values to numpy array
+        bool_values = np.array(bool_values)
+        
+        # Calculate weekly values for leh
+        weekly_values_leh = start_value_leh * np.cumprod(1 - 0.019 * bool_values)
+        
+        # Calculate weekly values for lur
+        weekly_values_lur = 1 - weekly_values_leh / lf.iloc[:len(weekly_values_leh)]
+        
+        # Return the weekly values
+        return weekly_values_leh, weekly_values_lur
+
+    def calculate_quarterly_average(self, start_value_leh, lf, start_week, duration):
+        # Create a boolean array with 1s for the duration and 0s for the rest
+        bool_values = np.zeros(start_week + duration)
+        bool_values[start_week:start_week+duration] = 1
+        
+        # Resample `lf` series to weekly frequency using linear interpolation
+        lf_weekly = lf.resample('W').interpolate()
+
+        # Calculate leh value before stayhome order
+        # start_quarter = self.week_to_quarter(start_week)
+        # start_value_leh = self.data.loc[start_quarter-1, 'leh']
+        start_value_leh = start_value_leh
+        # Calculate weekly values
+        weekly_values_leh, weekly_values_lur = self.calculate_weekly_values(start_value_leh, lf_weekly, bool_values)
+
+        # Fill the missing weeks for the quarter with the last calculated value
+        if (start_week + duration) % 13 != 0:
+            end_week = ((start_week + duration) // 13 + 1) * 13
+            last_calculated_value = weekly_values_leh[start_week + duration - 1]
+            for i in range(1, end_week - (start_week + duration)+1):
+                weekly_values_leh = np.append(weekly_values_leh , (weekly_values_leh[start_week + duration - i-1]))
+                weekly_values_lur = np.append(weekly_values_lur , (weekly_values_lur[start_week + duration - i-1]))
+
+
+        # Convert weekly values to Series
+        series_leh = pd.Series(weekly_values_leh)
+        series_lur = pd.Series(weekly_values_lur)
+
+        # Create a date range for the series index
+        dates = pd.date_range(start='2020-01-01', periods=len(series_leh), freq='W')
+
+        # Assign dates to series index
+        series_leh.index = dates
+        series_lur.index = dates
+
+        # print(series_leh)
+        # print(series_lur)
+
+        # Convert the index to PeriodIndex with quarterly frequency
+        series_leh.index = series_leh.index.to_period('Q')
+        series_lur.index = series_lur.index.to_period('Q')
+
+        # Resample the series to quarterly frequency and calculate mean
+        quarterly_avg_leh = series_leh.groupby(series_leh.index).mean()
+        quarterly_avg_lur = series_lur.groupby(series_lur.index).mean()
+
+        # print(quarterly_avg_leh)
+        # print(quarterly_avg_lur)
+
+        delta_leh = pd.concat([pd.Series(start_value_leh), quarterly_avg_leh])
+        delta_leh = delta_leh.diff().dropna()
+        # print("\ndelta\n", delta_leh)
+        # Return the quarterly averages and weekly series for verification
+        return quarterly_avg_leh, quarterly_avg_lur, delta_leh, start_value_leh
+
+    def solve_no_stayhome(self, start_stayhome_week=12, duration=6):
         print("Creating no stay-at-home orders scenario...")
 
-        start_stayhome = start_stayhome
-        end_stayhome = end_stayhome
+        start_quarter = self.week_to_quarter(start_stayhome_week) 
+        end_quarter = self.week_to_quarter(start_stayhome_week + duration)
+
         targ_no_stayhome, traj_no_stayhome, inst_no_stayhome = [], [], []
 
         no_stayhome_data = self.trac_non_dynamic_variables()
-        # Adjust unemployment rates for stay-at-home orders
-        no_stayhome_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = self.data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1 - .019)**self.real_stayhome
-        no_stayhome_data.loc[start_stayhome:end_stayhome, "lur_t"] = self.data.loc[start_stayhome:end_stayhome, 'lur'] * (1 - .019)**self.real_stayhome
+        # # Adjust unemployment rates for stay-at-home orders
 
-        no_stayhome_data.loc[end_stayhome+1:self.end, "lurnat_t"] = self.data.loc[end_stayhome+1:self.end, 'lurnat']
-        no_stayhome_data.loc[end_stayhome+1:self.end , "lur_t"] = self.data.loc[end_stayhome+1:self.end, 'lur']
+        lf = self.data['lf']
+
+        expected_leh_by_stayhome, _,delta_leh,_ = self.calculate_quarterly_average(lf = lf, start_value_leh = self.data.loc[start_quarter-1, 'leh'], start_week = start_stayhome_week, duration = duration)
+
+        convoi = expected_leh_by_stayhome - self.data.loc[start_quarter:end_quarter, 'leh']
+        # print("convoi", delta_leh)
+        # print(self.data.loc[start_quarter:end_quarter, 'leh'] + (delta_leh))
+
+        no_stayhome_data.loc[start_quarter:end_quarter, "leh_t"] = self.data.loc[start_quarter:end_quarter, 'leh'] - (delta_leh)
+
+
+        no_stayhome_data.loc[end_quarter+1:self.end , "leh_t"] = self.data.loc[end_quarter+1:self.end, 'leh']
         # Update target and trajectory lists
-        targ_no_stayhome += ['lur', 'lurnat']
-        traj_no_stayhome += ['lur_t', 'lurnat_t']
-        inst_no_stayhome += ['lur', 'lurnat']
+        targ_no_stayhome += ['leh', ]
+        traj_no_stayhome += ['leh_t',]
+        inst_no_stayhome += ['leh', ]
 
         # Run mcontrol to match the target variables to their trajectories
-        no_stayhome_result = self.model.mcontrol(start_stayhome, end_stayhome, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
-        no_stayhome_result = self.model.solve(end_stayhome+1, self.end, no_stayhome_result)
-        no_stayhome_result = self.model.mcontrol(end_stayhome+1, self.end, no_stayhome_result, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
+        no_stayhome_result = self.model.mcontrol(start_quarter, end_quarter, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
+        no_stayhome_result = self.model.solve(end_quarter+1, self.end, no_stayhome_result)
+        # no_stayhome_result = self.model.mcontrol(end_stayhome+1, self.end, no_stayhome_result, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
 
         return no_stayhome_result
 
-    def cal_stayhome_anticipated_errors(self, start_stayhome=pd.Period("2020Q2"), end_stayhome=pd.Period("2020Q2")):
+    def cal_stayhome_anticipated_errors(self, start_stayhome_week=12, duration=6, end_stayhome=pd.Period("2020Q2")):
         if self.no_stayhome is None:
             raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
         stayhome_aerr_data = self.no_stayhome.copy(deep=True)
 
-        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "lur_t"] = stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'lur'] * (1.019**self.real_stayhome)
-        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "lurnat_t"] = stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'lurnat'] * (1.019**self.real_stayhome)
+        start_stayhome = self.week_to_quarter(start_stayhome_week) 
+        end_stayhome = self.week_to_quarter(start_stayhome_week + duration)
 
-        stayhome_aerr = self.model.mcontrol(start_stayhome, end_stayhome, stayhome_aerr_data, ['lur', 'lurnat'], ['lur_t', 'lurnat_t'], ['lur', 'lurnat'])
+        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "leh_t"] = (stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'leh'] + 
+         self.calculate_quarterly_average(lf = stayhome_aerr_data['lf'], start_value_leh = stayhome_aerr_data.loc[start_stayhome-1, 'leh'], start_week = start_stayhome_week, duration = duration)[2])
+
+        stayhome_aerr = self.model.mcontrol(start_stayhome, end_stayhome, stayhome_aerr_data, ['leh'], ['leh_t'], ['leh'])
         stayhome_aerr = self.model.solve(end_stayhome+1, self.end, stayhome_aerr)
+
+        control = stayhome_aerr.copy(deep=True)
 
         # Calculate errors for each variable
         for name in self.variables['name']:
             try:
                 stayhome_aerr.loc[self.start:self.end, f"{name}_aerr"] = self.data.loc[self.start:self.end, name] - stayhome_aerr.loc[self.start:self.end, name]
+                control.loc[self.start:self.end, f"{name}"] += stayhome_aerr.loc[self.start:self.end, f"{name}_aerr"]
             except Exception as e:
                 print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
+        self.control = control
+
         return stayhome_aerr
 
-    def solve_custom_stayhome(self, start_lockdown_opt=pd.Period("2020Q2"), end_lockdown_opt=pd.Period("2020Q2"), custom_lockdown_duration=17,
+    def solve_custom_stayhome(self, start_lockdown_opt=12, custom_lockdown_duration=17,
                              targ_custom=None, traj_custom=None, inst_custom=None, custom_stayhome_data=None):
         if not targ_custom or not traj_custom or not inst_custom:
             print("No custom targets, trajectories and instruments provided. Using default empty values.")
             targ_custom, traj_custom, inst_custom = [], [], []
 
-        targ_custom += ['lur', 'lurnat']
-        traj_custom += ['lur_t', 'lurnat_t']
-        inst_custom += ['lur', 'lurnat']
+        print("\n", start_lockdown_opt,"\n")
+        end_lockdown_quarter = self.week_to_quarter(start_lockdown_opt + custom_lockdown_duration)        
+        start_lockdown_quarter = self.week_to_quarter(start_lockdown_opt)
+        print("\n", end_lockdown_quarter,"\n")
+        
+        targ_custom += ['leh',]
+        traj_custom += ['leh_t', ]
+        inst_custom += ['leh',]
 
         if custom_stayhome_data is None:
             print("No custom stayhome data provided. Using default values.")
@@ -99,11 +196,16 @@ class sm_frbus():
                 raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
             custom_stayhome_data = self.no_stayhome.copy(deep=True)
 
-        custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, "lur_t"] = custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, 'lur'] * (1.019**custom_lockdown_duration)
-        custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, "lurnat_t"] = custom_stayhome_data.loc[start_lockdown_opt:end_lockdown_opt, 'lurnat'] * (1.019**custom_lockdown_duration)
+        custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, 'leh'] + 
+         self.calculate_quarterly_average(lf = custom_stayhome_data['lf'], start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[2])
 
-        custom_stayhome = self.model.mcontrol(start_lockdown_opt, end_lockdown_opt, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
-        custom_stayhome = self.model.solve(end_lockdown_opt+1, self.end, custom_stayhome)
+
+        # print(self.data['lf'][-20:])
+        # print(custom_stayhome_data['leh'][-20:])
+        # print(custom_stayhome_data['lur'][-20:])
+
+        custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
+        custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome)
 
         # Apply anticipated errors
         for name in self.variables['name']:
@@ -157,7 +259,9 @@ class sm_frbus():
 
     def plot_results(self):
         # Generate plots
-        dfs = {'baseline': self.data, 'custom_stayhome': self.custom_stayhome, 'no_stayhome': self.no_stayhome, 'no_pandemic': self.no_pandemic}
+        dfs = {'baseline': self.data, 'custom_stayhome': self.custom_stayhome,
+             'no_stayhome': self.no_stayhome, 'no_pandemic': self.no_pandemic,
+             'control': self.control}
 
         plots = [
             {'column': 'xgdp', 'type': 'pct_change'},
@@ -196,13 +300,15 @@ def main():
     obj = sm_frbus()
     sm_df = pd.read_csv("../../sir_macro/csv/td2.csv")
     custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(sm_df)
-    obj.solve_custom_stayhome(start_lockdown_opt=pd.Period("2020Q2"), end_lockdown_opt=pd.Period("2020Q2"), custom_lockdown_duration=8,
+    obj.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=6,
                                 custom_stayhome_data=custom_stayhome_data,
                                 targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
 
     obj.plot_results()
     loss = obj.loss_econ() 
     print(loss)
+    print("conmeo", pd.Period("2020Q2")-1)
+    # print("convoi", pd.Period("2020Q2")+0.1)
 
 if __name__ == "__main__":
     main()

@@ -14,7 +14,7 @@ class covasim_sm_frbus():
         self.sm_res = None
         self.frbus_res = None
         self.start_stayhome = None
-        self.end_stayhome = None
+        self.weeks_stayhome = None
 
         self.loss_total = None
         self.loss_gdp = None
@@ -53,7 +53,7 @@ class covasim_sm_frbus():
     def run_sm_frbus(self):
         obj = sm_frbus()
         custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(self.sm_res)
-        custom_stayhome_res = obj.solve_custom_stayhome(start_lockdown_opt="2020Q2", end_lockdown_opt="2020Q2", custom_lockdown_duration=17,
+        custom_stayhome_res = obj.solve_custom_stayhome(start_lockdown_opt=self.start_stayhome, custom_lockdown_duration=custom_lockdown_duration,
                                 custom_stayhome_data=custom_stayhome_data,
                                 targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
         # obj.plot_results()
@@ -72,6 +72,12 @@ class covasim_sm_frbus():
         self.run_sm_frbus()
         self.cal_loss_total()
         
+    def optimize(self):
+        start_lockdown_opt = pd.Period('2020Q1')
+        custom_lockdown_duration = 0
+        obj = self.run_sm_frbus(start_lockdown_opt, custom_lockdown_duration)
+        self.loss_gdp = obj.loss_econ()
+        self.cal_loss_total()
 
 
 def main():

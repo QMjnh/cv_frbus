@@ -2,6 +2,7 @@ from daly import *
 from typing import Callable
 import numpy as np
 import json
+from math import ceil
 
 def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, **kwargs):
     """
@@ -19,7 +20,7 @@ def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, **kwargs):
     return derivative, loss
 
 
-def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto', verbose=False, patience=100, save_policy_as=None):
+def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto', verbose=False, patience=100, save_policy_as=None, integer_policy=False):
     """
     This function estimates the gradient of a function f(x, y, z, ...) when the form of f() is unknown
     f: the loss function to be estimated the gradient of
@@ -43,9 +44,16 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
     while True:
         for parameter in policy.keys():
             # print("parameter", parameter)
-            partial_derivative, current_loss = partial_derivative_estimate(f, param_name=parameter, **policy)
-            print("delta", learning_rate * partial_derivative)
-            policy[parameter] -= learning_rate * partial_derivative
+            if integer_policy:
+                partial_derivative, current_loss = partial_derivative_estimate(f,h=1, param_name=parameter, **policy)
+                policy[parameter] = ceil(policy[parameter] - learning_rate * partial_derivative)
+                print("delta", ceil(learning_rate * partial_derivative))
+
+            else:
+                partial_derivative, current_loss = partial_derivative_estimate(f, param_name=parameter, **policy)
+                policy[parameter] -= learning_rate * partial_derivative
+                print("delta", learning_rate * partial_derivative)
+
             # print("after update:", policy[parameter])
 
         # current_loss = f(**policy)

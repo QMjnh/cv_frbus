@@ -72,37 +72,41 @@ class sm_frbus():
         # Calculate weekly values
         weekly_values_leh, weekly_values_lur = self.calculate_weekly_values(start_value_leh, lf_weekly, bool_values)
 
+# LUR IS WRONG !!!!!!!!!!!!!!!!!!!
+        # print("type lur", weekly_values_lur)
+        # print(type(weekly_values_lur))
+
         # Fill the missing weeks for the quarter with the last calculated value
         if (start_week + duration) % 13 != 0:
             end_week = ((start_week + duration) // 13 + 1) * 13
             last_calculated_value = weekly_values_leh[start_week + duration - 1]
             for i in range(1, end_week - (start_week + duration)+1):
                 weekly_values_leh = np.append(weekly_values_leh , (weekly_values_leh[start_week + duration - i-1]))
-                weekly_values_lur = np.append(weekly_values_lur , (weekly_values_lur[start_week + duration - i-1]))
+                # weekly_values_lur = pd.concat([weekly_values_lur , pd.Series(weekly_values_lur[start_week + duration - i-1])], axis=0)
 
 
         # Convert weekly values to Series
         series_leh = pd.Series(weekly_values_leh)
-        series_lur = pd.Series(weekly_values_lur)
+        # series_lur = pd.Series(weekly_values_lur)
 
         # Create a date range for the series index
         dates = pd.date_range(start='2020-01-01', periods=len(series_leh), freq='W')
 
         # Assign dates to series index
         series_leh.index = dates
-        series_lur.index = dates
+        # series_lur.index = dates
 
         # print(series_leh)
         # print(series_lur)
 
         # Convert the index to PeriodIndex with quarterly frequency
         series_leh.index = series_leh.index.to_period('Q')
-        series_lur.index = series_lur.index.to_period('Q')
+        # series_lur.index = series_lur.index.to_period('Q')
 
         # Resample the series to quarterly frequency and calculate mean
         quarterly_avg_leh = series_leh.groupby(series_leh.index).mean()
-        quarterly_avg_lur = series_lur.groupby(series_lur.index).mean()
-
+        # quarterly_avg_lur = series_lur.groupby(series_lur.index).mean()
+        quarterly_avg_lur = None
         # print(quarterly_avg_leh)
         # print(quarterly_avg_lur)
 
@@ -181,10 +185,10 @@ class sm_frbus():
             print("No custom targets, trajectories and instruments provided. Using default empty values.")
             targ_custom, traj_custom, inst_custom = [], [], []
 
-        print("\n", start_lockdown_opt,"\n")
+        # print("\n", start_lockdown_opt,"\n")
         end_lockdown_quarter = self.week_to_quarter(start_lockdown_opt + custom_lockdown_duration)        
         start_lockdown_quarter = self.week_to_quarter(start_lockdown_opt)
-        print("\n", end_lockdown_quarter,"\n")
+        # print("\n", end_lockdown_quarter,"\n")
         
         targ_custom += ['leh',]
         traj_custom += ['leh_t', ]

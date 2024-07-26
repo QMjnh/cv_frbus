@@ -7,9 +7,12 @@ import numpy as np
 class sm_frbus():
     def __init__(self, start="2019Q4", end="2023Q4",
                  no_pandemic=None, no_stayhome=None,
-                 model_path="../models/model.xml", data_path="../data/HISTDATA.TXT"):
+                 model_path="../models/model.xml", data_path="../data/HISTDATA.TXT",
+                 verbose=False # False, partial, or full
+                 ):
         self.data = load_data("/home/mlq/fed model/pyfrbus/data/HISTDATA.TXT")
         self.model = Frbus("/home/mlq/fed model/pyfrbus/models/model.xml")
+        self.verbose = verbose
         self.start = start
         self.end = end
         self.real_stayhome = 8 # weeks that the stay-at-home orders is in effect in real life
@@ -23,7 +26,8 @@ class sm_frbus():
         self.stayhome_anticipated_errors = self.cal_stayhome_anticipated_errors()
         self.custom_stayhome = None
     def solve_no_pandemic(self):
-        print("Solving for no pandemic scenario...")
+        if self.verbose!=False:
+            print("Solving for no pandemic scenario...")
         result = self.model.solve(self.start, self.end, self.data)
         return result
 
@@ -33,7 +37,8 @@ class sm_frbus():
             try:
                 dummy[f"{name}_trac"] = np.zeros(len(self.data))
             except Exception as e:
-                print(f"Can't untrac dynamic variable '{name}', exception message: {e}")
+                if self.verbose == "full":
+                    print(f"Can't untrac dynamic variable '{name}', exception message: {e}")
 
         return dummy
 
@@ -44,37 +49,22 @@ class sm_frbus():
         end_date = date_range[-1]
         return end_date.to_period('Q')
 
-    def calculate_weekly_values(self, start_value_leh, lf, bool_values):
+    def calculate_weekly_values(self, start_value_leh, bool_values):
         # Convert bool_values to numpy array
-        bool_values = np.array(bool_values)
-        
+        bool_values = np.array(bool_values)        
         # Calculate weekly values for leh
-        weekly_values_leh = start_value_leh * np.cumprod(1 - 0.019 * bool_values)
-        
-        # Calculate weekly values for lur
-        weekly_values_lur = 1 - weekly_values_leh / lf.iloc[:len(weekly_values_leh)]
-        
+        weekly_values_leh = start_value_leh * np.cumprod(1 - 0.019 * bool_values)    
         # Return the weekly values
-        return weekly_values_leh, weekly_values_lur
+        return weekly_values_leh
 
-    def calculate_quarterly_average(self, start_value_leh, lf, start_week, duration):
+    def calculate_quarterly_average(self, start_value_leh, start_week, duration):
+        start_value_leh = start_value_leh
         # Create a boolean array with 1s for the duration and 0s for the rest
         bool_values = np.zeros(start_week + duration)
         bool_values[start_week:start_week+duration] = 1
-        
-        # Resample `lf` series to weekly frequency using linear interpolation
-        lf_weekly = lf.resample('W').interpolate()
-
-        # Calculate leh value before stayhome order
-        # start_quarter = self.week_to_quarter(start_week)
-        # start_value_leh = self.data.loc[start_quarter-1, 'leh']
-        start_value_leh = start_value_leh
+          
         # Calculate weekly values
-        weekly_values_leh, weekly_values_lur = self.calculate_weekly_values(start_value_leh, lf_weekly, bool_values)
-
-# LUR IS WRONG !!!!!!!!!!!!!!!!!!!
-        # print("type lur", weekly_values_lur)
-        # print(type(weekly_values_lur))
+        weekly_values_leh = self.calculate_weekly_values(start_value_leh, bool_values)
 
         # Fill the missing weeks for the quarter with the last calculated value
         if (start_week + duration) % 13 != 0:
@@ -82,42 +72,33 @@ class sm_frbus():
             last_calculated_value = weekly_values_leh[start_week + duration - 1]
             for i in range(1, end_week - (start_week + duration)+1):
                 weekly_values_leh = np.append(weekly_values_leh , (weekly_values_leh[start_week + duration - i-1]))
-                # weekly_values_lur = pd.concat([weekly_values_lur , pd.Series(weekly_values_lur[start_week + duration - i-1])], axis=0)
 
 
         # Convert weekly values to Series
         series_leh = pd.Series(weekly_values_leh)
-        # series_lur = pd.Series(weekly_values_lur)
 
         # Create a date range for the series index
         dates = pd.date_range(start='2020-01-01', periods=len(series_leh), freq='W')
 
         # Assign dates to series index
         series_leh.index = dates
-        # series_lur.index = dates
-
-        # print(series_leh)
-        # print(series_lur)
 
         # Convert the index to PeriodIndex with quarterly frequency
         series_leh.index = series_leh.index.to_period('Q')
-        # series_lur.index = series_lur.index.to_period('Q')
 
         # Resample the series to quarterly frequency and calculate mean
         quarterly_avg_leh = series_leh.groupby(series_leh.index).mean()
-        # quarterly_avg_lur = series_lur.groupby(series_lur.index).mean()
-        quarterly_avg_lur = None
-        # print(quarterly_avg_leh)
-        # print(quarterly_avg_lur)
+
 
         delta_leh = pd.concat([pd.Series(start_value_leh), quarterly_avg_leh])
         delta_leh = delta_leh.diff().dropna()
-        # print("\ndelta\n", delta_leh)
+
         # Return the quarterly averages and weekly series for verification
-        return quarterly_avg_leh, quarterly_avg_lur, delta_leh, start_value_leh
+        return quarterly_avg_leh, delta_leh, start_value_leh
 
     def solve_no_stayhome(self, start_stayhome_week=12, duration=6):
-        print("Creating no stay-at-home orders scenario...")
+        if self.verbose!=False:
+            print("Creating no stay-at-home orders scenario...")
 
         start_quarter = self.week_to_quarter(start_stayhome_week) 
         end_quarter = self.week_to_quarter(start_stayhome_week + duration)
@@ -127,13 +108,9 @@ class sm_frbus():
         no_stayhome_data = self.trac_non_dynamic_variables()
         # # Adjust unemployment rates for stay-at-home orders
 
-        lf = self.data['lf']
 
-        expected_leh_by_stayhome, _,delta_leh,_ = self.calculate_quarterly_average(lf = lf, start_value_leh = self.data.loc[start_quarter-1, 'leh'], start_week = start_stayhome_week, duration = duration)
+        expected_leh_by_stayhome, delta_leh,_ = self.calculate_quarterly_average(start_value_leh = self.data.loc[start_quarter-1, 'leh'], start_week = start_stayhome_week, duration = duration)
 
-        convoi = expected_leh_by_stayhome - self.data.loc[start_quarter:end_quarter, 'leh']
-        # print("convoi", delta_leh)
-        # print(self.data.loc[start_quarter:end_quarter, 'leh'] + (delta_leh))
 
         no_stayhome_data.loc[start_quarter:end_quarter, "leh_t"] = self.data.loc[start_quarter:end_quarter, 'leh'] - (delta_leh)
 
@@ -160,7 +137,7 @@ class sm_frbus():
         end_stayhome = self.week_to_quarter(start_stayhome_week + duration)
 
         stayhome_aerr_data.loc[start_stayhome:end_stayhome, "leh_t"] = (stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'leh'] + 
-         self.calculate_quarterly_average(lf = stayhome_aerr_data['lf'], start_value_leh = stayhome_aerr_data.loc[start_stayhome-1, 'leh'], start_week = start_stayhome_week, duration = duration)[2])
+         self.calculate_quarterly_average(start_value_leh = stayhome_aerr_data.loc[start_stayhome-1, 'leh'], start_week = start_stayhome_week, duration = duration)[1])
 
         stayhome_aerr = self.model.mcontrol(start_stayhome, end_stayhome, stayhome_aerr_data, ['leh'], ['leh_t'], ['leh'])
         stayhome_aerr = self.model.solve(end_stayhome+1, self.end, stayhome_aerr)
@@ -173,7 +150,8 @@ class sm_frbus():
                 stayhome_aerr.loc[self.start:self.end, f"{name}_aerr"] = self.data.loc[self.start:self.end, name] - stayhome_aerr.loc[self.start:self.end, name]
                 control.loc[self.start:self.end, f"{name}"] += stayhome_aerr.loc[self.start:self.end, f"{name}_aerr"]
             except Exception as e:
-                print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
+                if self.verbose == "full":
+                    print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
         self.control = control
 
@@ -181,6 +159,8 @@ class sm_frbus():
 
     def solve_custom_stayhome(self, start_lockdown_opt=12, custom_lockdown_duration=17,
                              targ_custom=None, traj_custom=None, inst_custom=None, custom_stayhome_data=None):
+        if self.verbose!=False:
+            print("Creating custom stay-at-home orders scenario...")
         if not targ_custom or not traj_custom or not inst_custom:
             print("No custom targets, trajectories and instruments provided. Using default empty values.")
             targ_custom, traj_custom, inst_custom = [], [], []
@@ -201,12 +181,7 @@ class sm_frbus():
             custom_stayhome_data = self.no_stayhome.copy(deep=True)
 
         custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, 'leh'] + 
-         self.calculate_quarterly_average(lf = custom_stayhome_data['lf'], start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[2])
-
-
-        # print(self.data['lf'][-20:])
-        # print(custom_stayhome_data['leh'][-20:])
-        # print(custom_stayhome_data['lur'][-20:])
+         self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[1])
 
         custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
         custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome)
@@ -216,7 +191,8 @@ class sm_frbus():
             try:
                 custom_stayhome[name] += self.stayhome_anticipated_errors[f"{name}_aerr"]
             except Exception as e:
-                print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
+                if self.verbose:
+                    print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
         self.custom_stayhome = custom_stayhome
         return custom_stayhome
@@ -312,7 +288,6 @@ def main():
     loss = obj.loss_econ() 
     print(loss)
     print("conmeo", pd.Period("2020Q2")-1)
-    # print("convoi", pd.Period("2020Q2")+0.1)
 
 if __name__ == "__main__":
     main()

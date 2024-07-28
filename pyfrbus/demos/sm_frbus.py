@@ -93,6 +93,9 @@ class sm_frbus():
         delta_leh = pd.concat([pd.Series(start_value_leh), quarterly_avg_leh])
         delta_leh = delta_leh.diff().dropna()
 
+        print("\n\nquarter leh", quarterly_avg_leh)
+        print("\ndelta", delta_leh)
+
         # Return the quarterly averages and weekly series for verification
         return quarterly_avg_leh, delta_leh, start_value_leh
 
@@ -180,8 +183,14 @@ class sm_frbus():
                 raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
             custom_stayhome_data = self.no_stayhome.copy(deep=True)
 
-        custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, 'leh'] + 
-         self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[1])
+        # custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, 'leh'] + 
+        #  self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[1])
+
+        custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (
+         self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[0])
+
+
+        print("\n\n", custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"], "\n\n")
 
         custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
         custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome)

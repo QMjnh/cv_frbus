@@ -7,7 +7,7 @@ from datetime import datetime
 class Covasim():
     def __init__(self):
         self.orig_sim = None
-        self.sim = None
+        self.custom_stayhome_res = None
         self.vax_df = pd.read_csv('/home/mlq/fed model/covasim/United States Vax.csv')
         self.start_stayhome = None
         self.duration_stayhome = None
@@ -18,8 +18,11 @@ class Covasim():
                 pop_type  = 'hybrid',
                 location = 'usa',
                 pop_infected = 100,
-                beta           = 0.13,                  
-                rel_death_prob = 2.67,                    
+                # beta           = 0.13,                  
+                # rel_death_prob = 2.67,        
+
+                beta =  0.12589663971276277,
+                rel_death_prob =  1.2706887764359567            
             )
 
     def orig_sim(self):
@@ -94,9 +97,9 @@ class Covasim():
         vax_end_date = (vax_end_date - sim_start_date).days
         
         days = [i for i in range(vax_start_date, vax_end_date)]
-        print("days",days)
+        # print("days",days)
         prob = vax_pop / len(days)
-        print("prob",prob)
+        # print("prob",prob)
 
         campaign = cv.historical_vaccinate_prob(
             vaccine = 'default',
@@ -116,10 +119,10 @@ class Covasim():
         df['delta_people_vax'] = df['people_vaccinated'].diff().fillna(df['people_vaccinated'])
         df['delta_people_fully_vax'] = df['people_fully_vaccinated'].diff().fillna(df['people_fully_vaccinated'])
 
-        print(df.loc[2020, 'delta_total_vax'])
+        # print(df.loc[2020, 'delta_total_vax'])
         # Convert start_day to datetime
         sim_start_date = pd.to_datetime(self.pars['start_day'])
-        print(sim_start_date)
+        # print(sim_start_date)
         # Group the DataFrame by six-month periods and create vaccination campaigns
         vax2020 = self.create_vaccination_campaign_simple(sim_start_date=sim_start_date, vax_start_date=pd.to_datetime("2020-12-01"), vax_end_date=pd.to_datetime("2020-12-31"), vax_pop=df.loc[2020, 'delta_total_vax'])
         vax2021 = self.create_vaccination_campaign_simple(sim_start_date=sim_start_date, vax_start_date=pd.to_datetime("2021-01-01"), vax_end_date=pd.to_datetime("2021-12-31"), vax_pop=df.loc[2021, 'delta_total_vax'])
@@ -153,8 +156,8 @@ class Covasim():
         ct = cv.contact_tracing(trace_probs=dict(h=1.0, s=0.5, w=0.5, c=0.3), do_plot=False)
         vax_campaigns = self.vax_simple()
 
-        # interventions = [lockdown, test, ct] + vax_campaigns 
-        interventions = [test, ct] + vax_campaigns 
+        interventions = [lockdown, test, ct] + vax_campaigns 
+        # interventions = [test, ct] + vax_campaigns 
 
 
         self.pars['interventions'] = interventions
@@ -166,7 +169,12 @@ class Covasim():
 
         sim.run()
         with_interventions = sim.to_df()
+        self.custom_stayhome_res = with_interventions
         with_interventions.to_csv('with-interventions.csv', index=False)
+
+        print(self.custom_stayhome_res)
+
+        return self.custom_stayhome_res
 
 
 

@@ -3,21 +3,34 @@ from typing import Callable
 import numpy as np
 import json
 from math import ceil
+from joblib import Parallel, delayed
+import csv
 
-def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, **kwargs):
+import multiprocessing
+from functools import partial
+from joblib import Memory
+import traceback
+
+def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, current_loss=None, **kwargs):
     """
     This function is to estimate the PARTIAL derivative of function f(x, y, z, ...) when the form of f() is unknown
     f: the loss function to be estimated the derivative of
     h: the infinitesimal change in x to estimate the derivative
-    x: the variable to which the derivative is estimated with respect to
+    param_name: the parameter name to which the derivative is estimated with respect to
+    current_loss: the pre-calculated loss for the current parameters, if not provided, it will be calculated
     """
-    # print("parital derivative is called!!!")
     kwargs_plus_h = kwargs.copy()
     kwargs_plus_h[param_name] += h
-    loss = f(**kwargs)
-    derivative = (f(**kwargs_plus_h) - loss) / h 
-    print("derivative", derivative)
-    return derivative, loss
+    
+    if not current_loss:
+        loss = f(**kwargs)
+        derivative = (f(**kwargs_plus_h) - loss) / h
+        print("derivative", derivative)
+        return derivative, loss
+    else:
+        derivative = (f(**kwargs_plus_h) - current_loss) / h
+        print("derivative", derivative)
+        return derivative
 
 
 def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto', verbose=False, patience=100, save_policy_as=None, integer_policy=False):
@@ -30,9 +43,227 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
     verbose: whether to print progress information
     patience: number of epochs to wait for improvement before stopping (when epochs='auto')
     save_policy_as: the name of the file to save the best policy as a JSON object
+    integer_policy: whether to round the policy parameters
     """
     policy_history = []  # Store the policy parameters at each epoch
     loss_history = []  # Store the loss at each epoch
+
+    print("Initial Policy", policy)
+    print("Starting Gradient Descent...")
+    
+    best_loss = float('inf')
+    epochs_without_improvement = 0
+    epoch = 0
+    
+    with open(log_file, 'w', newline='') as csvfile:
+        fieldnames = ['epoch', 'loss'] + list(policy.keys())
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        while True:
+            gradients = {}
+            current_loss = None
+            
+            # Compute all gradients first
+            for i, param_name in enumerate(policy.keys()):
+                if i == 0:
+                    # For the first parameter, calculate both gradient and loss
+                    if integer_policy:
+                        gradient, current_loss = partial_derivative_estimate(f, h=1, param_name=param_name, **policy)
+                    else:
+                        gradient, current_loss = partial_derivative_estimate(f, param_name=param_name, **policy)
+                else:
+                    # For subsequent parameters, use the previously calculated loss
+                    if integer_policy:
+                        gradient = partial_derivative_estimate(f, h=1, param_name=param_name, current_loss=current_loss, **policy)
+                    else:
+                        gradient = partial_derivative_estimate(f, param_name=param_name, current_loss=current_loss, **policy)
+                gradients[param_name] = gradient
+            
+            # Now update all parameters
+            for param_name in policy.keys():
+                gradient = gradients[param_name]
+                # Update the parameter
+                update = learning_rate * gradient
+                if integer_policy:
+                    policy[param_name] = ceil(policy[param_name] - update)
+                else:
+                    policy[param_name] -= update
+
+            if current_loss < 0:
+                print("Negative loss encountered in GD. Exiting...")
+                break
+            if verbose:
+                print(f'Epoch {epoch}: {policy}')
+                print(f'Loss: {current_loss}')
+            policy_history.append(policy.copy())
+            loss_history.append(current_loss)
+
+            # Write to CSV file
+            row = {'epoch': epoch, 'loss': current_loss}
+            row.update(policy)
+            writer.writerow(row)
+            csvfile.flush()  # Ensure it's written immediately
+
+            # Check for improvement
+            if current_loss < best_loss:
+                best_loss = current_loss
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
+            # Stopping criterion
+            if epochs == 'auto':
+                if epochs_without_improvement >= patience:
+                    print(f"Stopping: No improvement for {patience} epochs.")
+                    break
+            elif epoch >= epochs - 1:  # -1 because epoch is 0-indexed
+                break
+
+            epoch += 1
+
+    best_policy = policy_history[np.argmin(loss_history)]
+    print("Epochs ran:", epoch + 1)
+    print("Best policy:", best_policy)
+    print("Best loss:", np.min(loss_history))
+
+    if save_policy_as:
+        with open(save_policy_as, "w") as outfile: 
+            json.dump(best_policy, outfile)
+        print(f"Best policy saved as {save_policy_as}")
+
+    return best_policy, policy_history, loss_history
+
+
+
+def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100, save_policy_as=None, integer_policy=False, log_file='gradient_descent_log.csv'):
+    """
+    This function implements the gradient descent algorithm with Adam optimization to find the policy parameters that minimize the total economic loss.
+    f: the loss function to be estimated the gradient of
+    policy: the dictionary of parameters to optimize
+    learning_rate: the rate at which the gradient is updated
+    beta1, beta2: exponential decay rates for the moment estimates
+    epsilon: small constant for numerical stability
+    epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
+    verbose: whether to print progress information
+    patience: number of epochs to wait for improvement before stopping (when epochs='auto')
+    save_policy_as: the name of the file to save the best policy as a JSON object
+    integer_policy: whether to round the policy parameters to integers
+    """
+    policy_history = []
+    loss_history = []
+    m = {key: 0 for key in policy.keys()}
+    v = {key: 0 for key in policy.keys()}
+
+    print("Initial Policy", policy)
+    print("Starting Gradient Descent with Adam...")
+    
+    best_loss = float('inf')
+    epochs_without_improvement = 0
+    epoch = 0
+    
+    with open(log_file, 'w', newline='') as csvfile:
+        fieldnames = ['epoch', 'loss'] + list(policy.keys())
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        while True:
+            gradients = {}
+            current_loss = None
+            
+            # Compute all gradients first
+            for i, param_name in enumerate(policy.keys()):
+                if i == 0:
+                    # For the first parameter, calculate both gradient and loss
+                    if integer_policy:
+                        gradient, current_loss = partial_derivative_estimate(f, h=1, param_name=param_name, **policy)
+                    else:
+                        gradient, current_loss = partial_derivative_estimate(f, param_name=param_name, **policy)
+                else:
+                    # For subsequent parameters, use the previously calculated loss
+                    if integer_policy:
+                        gradient = partial_derivative_estimate(f, h=1, param_name=param_name, current_loss=current_loss, **policy)
+                    else:
+                        gradient = partial_derivative_estimate(f, param_name=param_name, current_loss=current_loss, **policy)
+                gradients[param_name] = gradient
+            
+            # Now update all parameters
+            for param_name in policy.keys():
+                gradient = gradients[param_name]
+                
+                # Update biased first moment estimate
+                m[param_name] = beta1 * m[param_name] + (1 - beta1) * gradient
+                # Update biased second raw moment estimate
+                v[param_name] = beta2 * v[param_name] + (1 - beta2) * (gradient ** 2)
+                # Compute bias-corrected first moment estimate
+                m_hat = m[param_name] / (1 - beta1 ** (epoch + 1))
+                # Compute bias-corrected second raw moment estimate
+                v_hat = v[param_name] / (1 - beta2 ** (epoch + 1))
+                # Update the parameter
+                update = learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+                if integer_policy:
+                    policy[param_name] = ceil(policy[param_name] - update)
+                else:
+                    policy[param_name] -= update
+
+            if current_loss < 0:
+                print("Negative loss encountered in GDwA. Exiting...")
+                break
+            if verbose:
+                print(f'Epoch {epoch}: {policy}')
+                print(f'Loss: {current_loss}')
+            policy_history.append(policy.copy())
+            loss_history.append(current_loss)
+
+            # Write to CSV file
+            row = {'epoch': epoch, 'loss': current_loss}
+            row.update(policy)
+            writer.writerow(row)
+            csvfile.flush()  # Ensure it's written immediately
+
+            # Check for improvement
+            if current_loss < best_loss:
+                best_loss = current_loss
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
+            # Stopping criterion
+            if epochs == 'auto':
+                if epochs_without_improvement >= patience:
+                    print(f"Stopping: No improvement for {patience} epochs.")
+                    break
+            elif epoch >= epochs - 1:  # -1 because epoch is 0-indexed
+                break
+
+            epoch += 1
+
+    best_policy = policy_history[np.argmin(loss_history)]
+    print("Epochs ran:", epoch + 1)
+    print("Best policy:", best_policy)
+    print("Best loss:", np.min(loss_history))
+
+    if save_policy_as:
+        with open(save_policy_as, "w") as outfile: 
+            json.dump(best_policy, outfile)
+        print(f"Best policy saved as {save_policy_as}")
+
+    return best_policy, policy_history, loss_history
+
+
+def compute_gradient(f, param_name, policy, integer_policy):
+    try:
+        if integer_policy:
+            gradient, loss = partial_derivative_estimate(f, h=1, param_name=param_name, **policy)
+        else:
+            gradient, loss = partial_derivative_estimate(f, param_name=param_name, **policy)
+        return param_name, gradient, loss
+    except Exception as e:
+        return param_name, str(e), traceback.format_exc()
+
+def parallel_gradient_descent(f: Callable, policy: dict, learning_rate=0.01, h=0.0001, epochs='auto', verbose=False, patience=100, save_policy_as=None, integer_policy=False):
+    policy_history = []
+    loss_history = []
 
     print("Initial Policy:", policy)
     print("Starting Gradient Descent...")
@@ -41,22 +272,31 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
     epochs_without_improvement = 0
     epoch = 0
 
+    # Create a pool of worker processes
+    num_cores = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=num_cores)
+
     while True:
+        # Prepare the function for parallel computation
+        compute_grad_func = partial(compute_gradient, f, policy=policy, h=h, integer_policy=integer_policy)
+        
+        # Compute gradients in parallel
+        results = pool.map(compute_grad_func, policy.keys())
+        
+        gradients = {}
+        current_loss = None
+        for param_name, gradient, loss in results:
+            gradients[param_name] = gradient
+            if current_loss is None:
+                current_loss = loss
+
+        # Update all parameters
         for parameter in policy.keys():
-            # print("parameter", parameter)
             if integer_policy:
-                partial_derivative, current_loss = partial_derivative_estimate(f,h=1, param_name=parameter, **policy)
-                policy[parameter] = ceil(policy[parameter] - learning_rate * partial_derivative)
-                print("delta", ceil(learning_rate * partial_derivative))
-
+                policy[parameter] = ceil(policy[parameter] - learning_rate * gradients[parameter])
             else:
-                partial_derivative, current_loss = partial_derivative_estimate(f, param_name=parameter, **policy)
-                policy[parameter] -= learning_rate * partial_derivative
-                print("delta", learning_rate * partial_derivative)
+                policy[parameter] -= learning_rate * gradients[parameter]
 
-            # print("after update:", policy[parameter])
-
-        # current_loss = f(**policy)
         if current_loss < 0:
             print("Negative loss encountered in GD. Exiting...")
             break
@@ -84,6 +324,10 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
 
         epoch += 1
 
+    # Close the pool of worker processes
+    pool.close()
+    pool.join()
+
     best_policy = policy_history[np.argmin(loss_history)]
     print("Epochs ran:", epoch + 1)
     print("Best policy:", best_policy)
@@ -97,23 +341,12 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
 
     return best_policy, policy_history, loss_history
 
-def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100, save_policy_as=None):
-    """
-    This function implements the gradient descent algorithm with Adam optimization to find the policy parameters that minimize the total economic loss.
-    f: the loss function to be estimated the gradient of
-    policy: the dictionary of parameters to optimize
-    learning_rate: the rate at which the gradient is updated
-    beta1, beta2: exponential decay rates for the moment estimates
-    epsilon: small constant for numerical stability
-    epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
-    verbose: whether to print progress information
-    patience: number of epochs to wait for improvement before stopping (when epochs='auto')
-    save_policy_as: the name of the file to save the best policy as a JSON object
-    """
-    policy_history = []  # Store the policy parameters at each epoch
-    loss_history = []  # Store the loss at each epoch
-    m = {key: 0 for key in policy.keys()}  # Initialize 1st moment vector
-    v = {key: 0 for key in policy.keys()}  # Initialize 2nd moment vector
+
+def parallel_gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100, save_policy_as=None, integer_policy=False):
+    policy_history = []
+    loss_history = []
+    m = {key: 0 for key in policy.keys()}
+    v = {key: 0 for key in policy.keys()}
 
     print("Initial Policy", policy)
     print("Starting Gradient Descent with Adam...")
@@ -122,11 +355,27 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
     epochs_without_improvement = 0
     epoch = 0
     
+    # Create a pool of worker processes
+    num_cores = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=num_cores)
+    
     while True:
+        # Prepare the function for parallel computation
+        compute_grad_func = partial(compute_gradient, f, policy=policy, integer_policy=integer_policy)
+        
+        # Compute gradients in parallel
+        results = pool.map(compute_grad_func, policy.keys())
+        
+        gradients = {}
+        current_loss = None
+        for param_name, gradient, loss in results:
+            gradients[param_name] = gradient
+            if current_loss is None:
+                current_loss = loss
+        
+        # Update all parameters
         for param_name in policy.keys():
-            # print("param_name", param_name)
-            # Estimate the gradient for the current parameter
-            gradient, current_loss = partial_derivative_estimate(f, param_name=param_name, **policy)
+            gradient = gradients[param_name]
             
             # Update biased first moment estimate
             m[param_name] = beta1 * m[param_name] + (1 - beta1) * gradient
@@ -137,9 +386,12 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
             # Compute bias-corrected second raw moment estimate
             v_hat = v[param_name] / (1 - beta2 ** (epoch + 1))
             # Update the parameter
-            policy[param_name] -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
-        
-        # current_loss = f(**policy)
+            update = learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+            if integer_policy:
+                policy[param_name] = ceil(policy[param_name] - update)
+            else:
+                policy[param_name] -= update
+
         if current_loss < 0:
             print("Negative loss encountered in GDwA. Exiting...")
             break
@@ -161,7 +413,120 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
             if epochs_without_improvement >= patience:
                 print(f"Stopping: No improvement for {patience} epochs.")
                 break
-        elif epoch >= epochs - 1:  # -1 because epoch is 0-indexed
+        elif epoch >= epochs - 1:
+            break
+
+        epoch += 1
+
+    # Close the pool of worker processes
+    pool.close()
+    pool.join()
+
+    best_policy = policy_history[np.argmin(loss_history)]
+    print("Epochs ran:", epoch + 1)
+    print("Best policy:", best_policy)
+    print("Best loss:", np.min(loss_history))
+
+    if save_policy_as:
+        with open(save_policy_as, "w") as outfile: 
+            json.dump(best_policy, outfile)
+        print(f"Best policy saved as {save_policy_as}")
+
+    return best_policy, policy_history, loss_history
+
+
+
+
+def joblib_parallel_gradient_descent_with_adam(run_func, policy, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, epochs='auto', verbose=False, patience=100, save_policy_as=None, integer_policy=False):
+    policy_history = []
+    loss_history = []
+    m = {key: 0 for key in policy.keys()}
+    v = {key: 0 for key in policy.keys()}
+
+    print("Initial Policy", policy)
+    print("Starting Gradient Descent with Adam...")
+    
+    best_loss = float('inf')
+    epochs_without_improvement = 0
+    epoch = 0
+    
+    # memory = Memory(location='.', verbose=0)
+    # @memory.cache
+    def compute_gradient(param_name):
+        try:
+            if integer_policy:
+                h = 1
+            else:
+                h = 0.0001
+            policy_plus_h = policy.copy()
+            policy_plus_h[param_name] += h
+            loss = run_func(**policy)
+            loss_plus_h = run_func(**policy_plus_h)
+            gradient = (loss_plus_h - loss) / h
+            return param_name, gradient, loss
+        except Exception as e:
+            return param_name, str(e), traceback.format_exc()
+
+    while True:
+        # Compute gradients in parallel
+        try:
+            results = Parallel(n_jobs=2, backend='threading')(delayed(compute_gradient)(param_name) for param_name in policy.keys())
+        except Exception as e:
+            print(f"Parallel execution failed: {str(e)}")
+            break
+
+        gradients = {}
+        current_loss = None
+        for param_name, gradient, loss in results:
+            if isinstance(gradient, str):
+                print(f"Error in computing gradient for {param_name}: {gradient}")
+                print(f"Traceback: {loss}")
+                return None, None, None
+            gradients[param_name] = gradient
+            if current_loss is None:
+                current_loss = loss
+        
+        # Update all parameters
+        for param_name in policy.keys():
+            gradient = gradients[param_name]
+            
+            # Update biased first moment estimate
+            m[param_name] = beta1 * m[param_name] + (1 - beta1) * gradient
+            # Update biased second raw moment estimate
+            v[param_name] = beta2 * v[param_name] + (1 - beta2) * (gradient ** 2)
+            # Compute bias-corrected first moment estimate
+            m_hat = m[param_name] / (1 - beta1 ** (epoch + 1))
+            # Compute bias-corrected second raw moment estimate
+            v_hat = v[param_name] / (1 - beta2 ** (epoch + 1))
+            # Update the parameter
+            update = learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+            if integer_policy:
+                policy[param_name] = ceil(policy[param_name] - update)
+            else:
+                policy[param_name] -= update
+
+        if current_loss < 0:
+            print("Negative loss encountered in GDwA. Exiting...")
+            break
+        if verbose:
+            print(f'Epoch {epoch}: {policy}')
+            print(f'Loss: {current_loss}')
+        policy_history.append(policy.copy())
+        loss_history.append(current_loss)
+
+        # Check for improvement
+        if current_loss < best_loss:
+            best_loss = current_loss
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        # Stopping criterion
+        if epochs == 'auto':
+            if epochs_without_improvement >= patience:
+                print(f"Stopping: No improvement for {patience} epochs.")
+                break
+        elif epoch >= epochs - 1:
             break
 
         epoch += 1
@@ -171,127 +536,12 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
     print("Best policy:", best_policy)
     print("Best loss:", np.min(loss_history))
 
-    # Convert and write JSON object to file
     if save_policy_as:
         with open(save_policy_as, "w") as outfile: 
             json.dump(best_policy, outfile)
         print(f"Best policy saved as {save_policy_as}")
 
     return best_policy, policy_history, loss_history
-
-
-class GD():
-    def __init__(loss_func:Callable, policy:dict, learning_rate=0.001, derivative_step = .0001,
-                 beta1=0.9, beta2=0.999, epsilon=1e-8,
-                 epochs='auto', verbose=False, patience=100, save_policy_as=None):
-        self.loss = None
-        self.policy = policy
-        self.learning_rate = learning_rate
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.epsilon = epsilon
-        self.epochs = epochs
-        self.verbose = verbose
-        self.patience = patience
-        self.save_policy_as = save_policy_as
-        self.derivative_step = derivative_step
-        self.loss_func = loss_func
-
-        self.policy_history = None
-        self.loss_history = None
-        self.best_policy = None
-
-    def partial_derivative_estimate(self, param_name:str, **kwargs):
-        """
-        This function is to estimate the PARTIAL derivative of function f(x, y, z, ...) when the form of f() is unknown
-        f: the loss function to be estimated the derivative of
-        h: the infinitesimal change in x to estimate the derivative
-        x: the variable to which the derivative is estimated with respect to
-        """
-        # print("parital derivative is called!!!")
-        kwargs_plus_h = kwargs.copy()
-        kwargs_plus_h[param_name] += self.derivative_step
-        self.loss = self.loss_func(**kwargs)
-        return (self.loss_func(**kwargs_plus_h) - self.loss) / self.derivative_step
-
-
-    def gradient_descent(self):
-        """
-        This function estimates the gradient of a function f(x, y, z, ...) when the form of f() is unknown
-        f: the loss function to be estimated the gradient of
-        policy: the dictionary of parameters to optimize
-        learning_rate: the rate at which the gradient is updated
-        epochs: the number of epochs to update the gradient, or 'auto' for automatic stopping
-        verbose: whether to print progress information
-        patience: number of epochs to wait for improvement before stopping (when epochs='auto')
-        save_policy_as: the name of the file to save the best policy as a JSON object
-        """
-        self.policy_history = []  # Store the policy parameters at each epoch
-        self.loss_history = []  # Store the loss at each epoch
-
-        print("Initial Policy:", self.policy)
-        print("Starting Gradient Descent...")
-
-        best_loss = float('inf')
-        epochs_without_improvement = 0
-        epoch = 0
-
-        while True:
-            for parameter in self.policy.keys():
-                # print("parameter", parameter)
-                partial_derivative = self.partial_derivative_estimate(param_name=parameter, **self.policy)
-                self.policy[parameter] -= self.learning_rate * partial_derivative
-                # print("after update:", policy[parameter])
-
-            current_loss = self.loss
-            if current_loss < 0:
-                print("Negative loss encountered in GD. Exiting...")
-                break
-            self.policy_history.append(self.policy.copy())
-            self.loss_history.append(current_loss)
-
-            if self.verbose:
-                print(f'epoch {epoch}: {policy}')
-                print(f'Loss: {current_loss}')
-
-            # Check for improvement
-            if current_loss < best_loss:
-                best_loss = current_loss
-                epochs_without_improvement = 0
-            else:
-                epochs_without_improvement += 1
-
-            # Stopping criterion
-            if epochs == 'auto':
-                if epochs_without_improvement >= self.patience:
-                    print(f"Stopping: No improvement for {self.patience} epochs.")
-                    break
-            elif epoch >= self.epochs - 1:  # -1 because epoch is 0-indexed
-                break
-
-            epoch += 1
-
-        self.best_policy = self.policy_history[np.argmin(self.loss_history)]
-        print("Epochs ran:", epoch + 1)
-        print("Best policy:", self.best_policy)
-        print("Best loss:", np.min(self.loss_history))
-
-        # Convert and write JSON object to file
-        if self.save_policy_as:
-            with open(save_policy_as, "w") as outfile: 
-                json.dump(self.best_policy, outfile)
-            print(f"Best policy saved as {self.save_policy_as}")
-
-        return self.best_policy, self.policy_history, self.loss_history
-
-    def gradient_descent_with_adam():
-        pass
-
-
-
-
-
-
 
 
 

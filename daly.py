@@ -10,7 +10,58 @@ Original file is located at
 <p align='center'><img src='https://drive.google.com/uc?export=view&id=1VSPOvi0anGYSLnt4JaqwK1fiD7B4O3X7' alt='Compartment flowchart' height='400px' width='2500px'></p>
 """
 
-def cal_yld(num_infected, weights='default'):
+def cal_yld_precise(num_infected, num_mild, num_severe, num_critical, weights='default'):
+  # Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
+
+  # mild-moderate and symtomatic are used interchangeably
+
+  # Default disability weights for COVID-19 states
+  if weights == 'default':
+      weights = {
+          'mild_moderate': 0.051,
+          'severe': 0.133,
+          'critical': 0.655,
+          'post_acute': 0.219 #post-covid
+
+      # source: https://www.ssph-journal.org/journals/international-journal-of-public-health/articles/10.3389/ijph.2021.619011/full
+      }
+
+  duration = {
+      # 'asym2rec': 8.0
+      'inf2sym': 1.1,
+      'sym2sev' : 6.6,
+      'sev2crit': 1.5,
+      'mild2rec': 8.0,
+      'sev2rec': 18.1,
+      'crit2rec': 18.1,
+      'crit2die': 10.7,
+      'post_acute': 41
+      #source: https://github.com/InstituteforDiseaseModeling/covasim/blob/main/covasim/parameters.py
+      # https://www.nature.com/articles/s41591-021-01292-y
+  }
+
+  proportions = {
+    'post_acute': .133}
+
+  yld_mild2rec = num_mild * duration['mild2rec'] * weights['mild_moderate']
+
+  yld_mild2sev = num_mild * duration['sym2sev'] * weights['mild_moderate']
+  yld_sev2rec = yld_mild2sev + num_severe * duration['sev2rec'] * weights['severe']
+
+  yld_mild2crit = yld_mild2sev + num_severe * duration['sev2crit'] * weights['severe']
+  yld_crit2rec =  yld_mild2crit + num_critical * duration['crit2rec'] * weights['critical']
+
+  yld_crit2die = yld_mild2crit + num_critical * duration['crit2die'] * weights['critical']
+
+  yld_post_acute = num_infected * proportions['post_acute'] * duration['post_acute'] * weights['post_acute']
+
+
+  total_yld = yld_mild2rec + yld_sev2rec + yld_crit2rec + yld_crit2die + yld_post_acute
+
+  return total_yld
+
+
+def cal_yld_avg(num_infected, weights='default'):
   # Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
 
   # Default disability weights for COVID-19 states
@@ -79,10 +130,25 @@ def cal_yll(num_death):
 
  return yll
 
-def cal_daly(num_infected, num_death):
-  daly = cal_yld(num_infected) + cal_yll(num_death)
+def cal_daly_avg(num_infected, num_death):
+  daly = cal_yld_avg(num_infected) + cal_yll(num_death)
   return daly
 
-def cal_econ_daly(covasim_result_df, price_per_daly=95075):
+def cal_econ_daly_avg(covasim_result_df, price_per_daly=95075):
   num_infected, num_death = covasim_result_df['I'].sum(), covasim_result_df['D'].sum()
-  return cal_daly(num_infected, num_death) * price_per_daly
+  return cal_daly_avg(num_infected, num_death) * price_per_daly
+
+
+
+
+
+def cal_daly_precise(num_infected, num_mild, num_severe, num_critical, num_death):
+  daly = cal_yld_precise(num_infected, num_mild, num_severe, num_critical) + cal_yll(num_death)
+  return daly
+
+def cal_econ_daly_precise(covasim_result_df, price_per_daly=95075):
+  num_mild, num_severe = covasim_result_df['cum_symptomatic'].iloc[-1], covasim_result_df['cum_severe'].iloc[-1]
+  num_critical, num_death = covasim_result_df['cum_critical'].iloc[-1], covasim_result_df['cum_deaths'].iloc[-1]
+  num_infected = covasim_result_df['cum_infections'].iloc[-1]
+  
+  return cal_daly_precise(num_infected, num_mild, num_severe, num_critical, num_death) * price_per_daly

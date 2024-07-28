@@ -9,7 +9,7 @@ import sys
 import time
 sys.path.insert(0, '..')
 from find_policy import *
-from find_policy_parallel import *
+# from find_policy_parallel import *
 
 class sir_macro_obj():
         def __init__(self, covasim_res, start_stayhome, end_stayhome, epochs='auto', patience=5, learning_rate=.5, save_policy_as=None, sim_duraion=208, verbose=False, fig_name='./png/convoi2.png'):

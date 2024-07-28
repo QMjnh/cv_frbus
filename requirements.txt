@@ -1,0 +1,8 @@
+optuna
+covasim
+joblib
+pandas
+numpy
+sciris
+matplotlib
+scipy

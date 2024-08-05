@@ -14,7 +14,6 @@ plt.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.95, hspace=0.55)
 colors = ['tab:blue', 'tab:red']  # Specify the colors for the lines
 
 fig.suptitle('COVID-19 Comparison (β$_{SAH}=0.3$)', fontsize=14, y=0.985, x=0.525)
-# fig.suptitle('COVID-19 Scenarios (β=0.5)', fontsize=14, y=0.985, x=0.525)
 
 
 for i in range(4):
@@ -33,22 +32,14 @@ ax[0].set_title('New Infections')
 # Extract the month and year from the 'date' column
 df_orig['month_year'] = pd.to_datetime(df_orig['date']).dt.to_period('M')
 df_sah['month_year'] = pd.to_datetime(df_sah['date']).dt.to_period('M')
-# print(df_sah['month_year'].unique())
 
 # Set the xticks for each subplot
 for i in range(4):
-    # print(df_orig['month_year'].unique()[::3])
     xtick_lst = []
     for j in df_orig['month_year'].unique()[::3]:
-        # print(j)
         xtick_lst.append(int(df_orig[df_orig['month_year'] == j].iloc[0].loc['t']))
-        # ax[i].set_xticks([first_row['month_year']])
-        # ax[i].set_xticklabels([first_row['month_year']])
 
-    # print(type(xtick_lst), xtick_lst)
-    # print(type(xtick_lst[0]))
     ax[i].set_xticks(xtick_lst)
-    # ax[i].set_xticklabels(df_orig['month_year'].unique()[::3], rotation=45)
 
     # Ensure the number of labels matches the number of ticks
     labels = [date.strftime('%m-%Y') for date in df_orig['month_year'].unique()[::3]]

@@ -71,7 +71,7 @@ ax[3].set_title('Cumulative Deaths')
 start_vax = (pd.to_datetime("2020-12-13") - pd.to_datetime("2020-01-05")).days
 
 start_sah = pd.to_datetime("2020-01-05") + pd.DateOffset(weeks=5)
-end_sah = start_sah + pd.DateOffset(weeks=14)
+end_sah = start_sah + pd.DateOffset(weeks=11)
 
 start_sah = (start_sah - pd.to_datetime("2020-01-05")).days
 end_sah = (end_sah - pd.to_datetime("2020-01-05")).days

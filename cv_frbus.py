@@ -1,8 +1,7 @@
 import sys
 from daly import *
 from find_policy import *
-# from find_policy_series import *
-# from scipy.stats import norm
+import covasim as cv
 sys.path.insert(0, '/home/mlq/fed model/pyfrbus')
 from demos.sm_frbus import sm_frbus
 sys.path.insert(0, '/home/mlq/fed model/sir_macro')
@@ -11,35 +10,6 @@ sys.path.insert(0, '/home/mlq/fed model/covasim')
 from simulations import Covasim
 from joblib import Memory
 
-
-
-# import contextlib
-# import resource
-
-# @contextlib.contextmanager
-# def limit_memory(max_mem_gb):
-#     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#     resource.setrlimit(resource.RLIMIT_AS, (max_mem_gb * 1024 * 1024 * 1024, hard))
-#     try:
-#         yield
-#     finally:
-#         resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
-
-
-
-
-
-
-
-def global_run_function(start_stayhome, duration_stayhome):
-    """
-    because the sm_frbus or Covasim objects contain unpicklable elements.
-    We need to avoid passing these objects through the multiprocessing pool.
-    This approach creates a new cv_frbus object for each function call in the parallel processing, which should avoid the pickling issues.
-    However, this might be less efficient if creating these objects is time-consuming.
-    """
-    obj = cv_frbus()
-    return obj.run(start_stayhome, duration_stayhome)
 
 class cv_frbus():
     def __init__(self, start_stayhome=None, duration_stayhome=None):
@@ -60,32 +30,32 @@ class cv_frbus():
         self.loss_history = None
     
     def run_covasim(self):
-        # covasim = Covasim()
-        # covasim_df = covasim.custom_sim(self.start_stayhome, self.duration_stayhome)
-
         self.covasim_res = self.covasim_obj.custom_sim(self.start_stayhome, self.duration_stayhome)
 
 
     def run_frbus(self):
         self.frbus_res = self.frbus_obj.solve_custom_stayhome(start_lockdown_opt=self.start_stayhome, custom_lockdown_duration=self.duration_stayhome)
         # obj.plot_results()
-        self.loss_gdp = self.frbus_obj.loss_econ()
+        self.loss_gdp = abs(self.frbus_obj.loss_econ())
         # return frbus_obj
 
     def cal_loss_total(self):
-        with open(log_file, 'w') as log:
-            log.write("Loss_GDP,Loss_DALY,Start_week,Duration\n")  # Write header
-            loss_econ_daly = cal_econ_daly_precise(self.covasim_res)*331
-            self.loss_total = self.loss_gdp + loss_econ_daly
+        scale_factor = 331000000/self.covasim_obj.pars['pop_size']
+        log_file = 'loss_log.txt'
+        with open(log_file, 'a') as log:
+            log.write("Loss_GDP,Loss_DALY,Loss_total,Start_week,Duration\n")  # Write header
+            self.loss_econ_daly = cal_econ_daly_precise(self.covasim_res)*scale_factor
+            self.loss_total = self.loss_gdp + self.loss_econ_daly
             # print("\n\nconcho\n", self.loss_gdp + loss_econ_daly)
-            log.write(f"{self.loss_gdp},{loss_econ_daly},{self.start_stayhome},{self.duration_stayhome}\n")
+            print("Writing to log file")
+            log.write(f"{self.loss_gdp},{self.loss_econ_daly},{self.loss_total},{self.start_stayhome},{self.duration_stayhome}\n")
 
         return self.loss_total
 
     def run(self, start_stayhome, duration_stayhome):
         self.start_stayhome = start_stayhome
         self.duration_stayhome = duration_stayhome
-        # print(self.start_stayhome, self.duration_stayhome)
+        print("start-end main",self.start_stayhome, self.duration_stayhome)
         self.run_frbus()
         self.run_covasim()
         self.cal_loss_total()
@@ -96,22 +66,14 @@ class cv_frbus():
         
     def optimize(self):
 
-        policy = {'start_stayhome': 7, 'duration_stayhome': 13}
+        policy = {'start_stayhome': 3, 'duration_stayhome': 5}
         # self.run(policy)
         self.best_policy, self.policy_history, self.loss_history = gradient_descent_with_adam(self.run, policy, verbose=True, epochs='auto',
                                                                          learning_rate=1, 
-                                                                         save_policy_as='sample.json', integer_policy=True)
+                                                                         save_policy_as='sample.json', integer_policy=True,
+                                                                         log_file='log_new.csv')
 
     def optimize_parallel(self):
-        ## multiprocessing
-        # policy = {'start_stayhome': 8, 'duration_stayhome': 11}
-        
-        # self.best_policy, self.policy_history, self.loss_history = parallel_gradient_descent_with_adam(
-        #     global_run_function, policy, verbose=True, epochs='auto',
-        #     learning_rate=1, 
-        #     save_policy_as='sample.json', integer_policy=True)
-
-
         # joblib
         # memory = Memory(location='.', verbose=0)
         policy = {'start_stayhome': 8, 'duration_stayhome': 11}
@@ -122,15 +84,90 @@ class cv_frbus():
             learning_rate=1, 
             save_policy_as='sample.json', integer_policy=True)
 
+    def plot_results(self, start_stayhome, duration_stayhome):
+        self.start_stayhome = start_stayhome
+        self.duration_stayhome = duration_stayhome
+        self.run_frbus()
+
+
+
+
+
+
 def main():
     obj = cv_frbus()
-    # obj.run()
+    obj.run(5,12)
     # obj.optimize_parallel()
-    obj.optimize()
+    # obj.optimize()
     # print(obj.loss_total())
     obj.frbus_obj.plot_results()
-    cv_fig = obj.covasim_obj.plot()
+
+    print("\n\nXGDP:", (obj.frbus_obj.custom_stayhome - obj.frbus_obj.data)["xgdp"].sum())
+
+    print("\n\nXGDPN:", (obj.frbus_obj.custom_stayhome - obj.frbus_obj.data)["xgdpn"].sum())
+
+
+
+
+    # obj.covasim_obj.orig_sim()
+
+
+    obj.covasim_obj.custom_stayhome_res.to_csv('SAH_5_12_30per.csv', index=False)
+    # obj.covasim_obj.orig_sim_obj.to_df().to_csv('no_SAH_5_8.csv', index=False)
+
+
+    print(f"{obj.loss_gdp},{obj.loss_econ_daly},{obj.loss_total},{obj.start_stayhome},{obj.duration_stayhome}\n")
+
+    
+    # cv.plot_compare(obj.covasim_obj.custom_stayhome_res, do_save=True)
+
+    
+    cv_fig = obj.covasim_obj.custom_sim_obj.plot(do_save=True)
+
+
+
+
+
+    # s1 = cv.Sim(beta=0.01, label='Low')
+    # s2 = cv.Sim(beta=0.02, label='High')
+    # cv.parallel(obj.covasim_obj.orig_sim_obj, obj.covasim_obj.custom_sim_obj).plot(do_save=True)
+    # msim = cv.parallel([s1, s2], keep_people=True)
+
+
+    msim = cv.MultiSim([obj.covasim_obj.orig_sim_obj, obj.covasim_obj.custom_sim_obj])
+    msim_fig = msim.plot()
+
+
+    # from datetime import datetime
+
+    # # Assuming msim_fig is your existing figure with subplots
+    # fig = msim_fig.figure
+
+    # # Convert the date string to a datetime object
+    # vax_start_date = datetime.strptime('2020-12-13', '%Y-%m-%d')
+
+    # # Add vertical line to each subplot
+    # for ax in fig.axes:
+    #     ax.axvline(x=vax_start_date, color='gray', linestyle='--', linewidth=1, label='Start Vaccination')
+
+    # # Adjust the legend to include the new line
+    # handles, labels = ax.get_legend_handles_labels()
+    # ax.legend(handles, labels, loc='best')
+
+    # # Update the x-axis to ensure the new line is visible
+    # for ax in fig.axes:
+    #     ax.set_xlim(left=min(ax.get_xlim()[0], mdates.date2num(vax_start_date)))
+
+    # # Redraw the figure
+    # fig.canvas.draw()
+
+    # Save the figure
+    # fig.savefig('msim6-5.png', dpi=300, bbox_inches='tight')
+
     cv_fig.savefig('covasim_plot.png', dpi=300, bbox_inches='tight')
+
+    cv.savefig(fig=msim_fig, filename="msim5-8.png", dpi=300)
+    print(f"{obj.loss_gdp},{obj.loss_econ_daly},{obj.loss_total},{obj.start_stayhome},{obj.duration_stayhome}\n")
 
 
 

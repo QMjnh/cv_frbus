@@ -2,7 +2,7 @@ from daly import *
 from typing import Callable
 import numpy as np
 import json
-from math import ceil
+from math import ceil, floor
 from joblib import Parallel, delayed
 import csv
 
@@ -25,11 +25,11 @@ def partial_derivative_estimate(f:Callable, param_name:str, h=.0001, current_los
     if not current_loss:
         loss = f(**kwargs)
         derivative = (f(**kwargs_plus_h) - loss) / h
-        print("derivative", derivative)
+        # print("derivative", derivative)
         return derivative, loss
     else:
         derivative = (f(**kwargs_plus_h) - current_loss) / h
-        print("derivative", derivative)
+        # print("derivative", derivative)
         return derivative
 
 
@@ -86,7 +86,7 @@ def gradient_descent(f: Callable, policy: dict, learning_rate=0.01, epochs='auto
                 # Update the parameter
                 update = learning_rate * gradient
                 if integer_policy:
-                    policy[param_name] = ceil(policy[param_name] - update)
+                    policy[param_name] = policy[param_name] - ceil(update)
                 else:
                     policy[param_name] -= update
 
@@ -173,18 +173,21 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
             
             # Compute all gradients first
             for i, param_name in enumerate(policy.keys()):
+                print("Param", param_name)
                 if i == 0:
                     # For the first parameter, calculate both gradient and loss
                     if integer_policy:
                         gradient, current_loss = partial_derivative_estimate(f, h=1, param_name=param_name, **policy)
                     else:
                         gradient, current_loss = partial_derivative_estimate(f, param_name=param_name, **policy)
+                    print(f"gradient {param_name}", gradient)
                 else:
                     # For subsequent parameters, use the previously calculated loss
                     if integer_policy:
                         gradient = partial_derivative_estimate(f, h=1, param_name=param_name, current_loss=current_loss, **policy)
                     else:
                         gradient = partial_derivative_estimate(f, param_name=param_name, current_loss=current_loss, **policy)
+                    print(f"gradient {param_name}", gradient)
                 gradients[param_name] = gradient
             
             # Now update all parameters
@@ -201,8 +204,16 @@ def gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0.001, bet
                 v_hat = v[param_name] / (1 - beta2 ** (epoch + 1))
                 # Update the parameter
                 update = learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
+                print(f"pre update {param_name}", update)
                 if integer_policy:
-                    policy[param_name] = ceil(policy[param_name] - update)
+                    if update < 0:
+                        update = floor(update)
+                    else:
+                        update = ceil(update)
+                    policy[param_name] = policy[param_name] - update
+                    if policy[param_name] < 1:
+                        policy[param_name] = 1
+                    print(f"post update {param_name}", update, policy[param_name])
                 else:
                     policy[param_name] -= update
 
@@ -293,7 +304,10 @@ def parallel_gradient_descent(f: Callable, policy: dict, learning_rate=0.01, h=0
         # Update all parameters
         for parameter in policy.keys():
             if integer_policy:
-                policy[parameter] = ceil(policy[parameter] - learning_rate * gradients[parameter])
+                if gradients[parameter] < 0:
+                    policy[parameter] = policy[parameter] - floor(learning_rate * gradients[parameter])
+                else:
+                    policy[parameter] = policy[parameter] - ceil(learning_rate * gradients[parameter])
             else:
                 policy[parameter] -= learning_rate * gradients[parameter]
 
@@ -388,7 +402,10 @@ def parallel_gradient_descent_with_adam(f:Callable, policy:dict, learning_rate=0
             # Update the parameter
             update = learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
             if integer_policy:
-                policy[param_name] = ceil(policy[param_name] - update)
+                if update < 0:
+                    policy[param_name] = policy[param_name] - floor(update)
+                else:
+                    policy[param_name] = policy[param_name] - ceil(update)
             else:
                 policy[param_name] -= update
 

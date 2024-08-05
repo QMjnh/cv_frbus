@@ -80,4 +80,4 @@ with_adds.loc[start : start + 2, "dmptlur_aerr"] = -1
 sim = frbus.solve(start, end, with_adds)
 
 # View results, unemployment threshold binds
-sim_plot(with_adds, sim, start, end)
+sim_plot(with_adds, sim, start, end, "./png/example3.png")

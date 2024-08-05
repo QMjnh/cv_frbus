@@ -29,4 +29,4 @@ with_adds.loc[start, "rffintay_aerr"] += 1
 sim = frbus.solve(start, end, with_adds)
 
 # View results
-sim_plot(with_adds, sim, start, end)
+sim_plot(with_adds, sim, start, end, "./png/example2.png")

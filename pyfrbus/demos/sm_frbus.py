@@ -24,6 +24,7 @@ class sm_frbus():
                             | (self.variables["sector"] == "Government")
                             ].name
 
+        self.loss_df = None
         self.control = None 
         self.no_pandemic = self.solve_no_pandemic()
         self.no_stayhome = self.solve_no_stayhome()
@@ -118,7 +119,7 @@ class sm_frbus():
         # Return the quarterly averages and weekly series for verification
         return quarterly_avg_leh, delta_leh, start_value_leh
 
-    def solve_no_stayhome(self, start_stayhome_week=12, duration=7):
+    def solve_no_stayhome(self, start_stayhome_week=12, duration=6):
         if self.verbose!=False:
             print("Creating no stay-at-home orders scenario...")
 
@@ -131,30 +132,14 @@ class sm_frbus():
         # # Adjust unemployment rates for stay-at-home orders
 
 
-        expected_leh_by_stayhome, delta_leh,_ = self.calculate_quarterly_average(start_value_leh = self.data.loc[start_quarter-1, 'leh'], start_week = start_stayhome_week, duration = duration, decrease_rate=0.019)
+        expected_leh_by_stayhome, delta_leh,_ = self.calculate_quarterly_average(start_value_leh = self.data.loc[start_quarter-1, 'leh'], start_week = start_stayhome_week, duration = duration)
+
+
         no_stayhome_data.loc[start_quarter:end_quarter, "leh_t"] = self.data.loc[start_quarter:end_quarter, 'leh'] - (delta_leh)
 
-        # expected_ec_by_stayhome, delta_ec,_ = self.calculate_quarterly_average(start_value_leh = self.data.loc[start_quarter-1, 'ec'], start_week = start_stayhome_week, duration = duration, decrease_rate=0.00002)
-        # no_stayhome_data.loc[start_quarter-1:end_quarter, "ec_t"] = self.data.loc[start_quarter:end_quarter, 'ec'] + (delta_ec)
 
-        # no_stayhome_data.loc[start_quarter:end_quarter, "ec_t"] =   [no_stayhome_data.loc[start_quarter-1, "ec"]*(1-0.02), no_stayhome_data.loc[start_quarter-1, "ec"]*(1-0.02)**2]
-        # no_stayhome_data.loc[end_quarter+1:self.end, "ec_t"] = self.data.loc[end_quarter+1:self.end, 'ec']
-        # print("\n\nEC_T", no_stayhome_data.loc[start_quarter:self.end, "ec_t"], "\n\n")
-
-        # no_stayhome_data.loc[start_quarter:end_quarter, "ec_aerr"] =  (delta_ec)
-
-
-        # no_stayhome_data.loc[start_quarter:end_quarter, "leh_aerr"] =  (delta_leh)
-
-
-        # no_stayhome_data.loc[end_quarter+1:self.end , "leh_t"] = self.data.loc[end_quarter+1:self.end, 'leh']
-        # no_stayhome_data.loc[end_quarter+1:self.end , "ec_t"] = self.data.loc[end_quarter+1:self.end, 'ec']
-
+        no_stayhome_data.loc[end_quarter+1:self.end , "leh_t"] = self.data.loc[end_quarter+1:self.end, 'leh']
         # Update target and trajectory lists
-        # targ_no_stayhome += ['leh', 'ec']
-        # traj_no_stayhome += ['leh_t','ec_t']
-        # inst_no_stayhome += ['leh', 'ec']
-
         targ_no_stayhome += ['leh', ]
         traj_no_stayhome += ['leh_t',]
         inst_no_stayhome += ['leh', ]
@@ -162,31 +147,23 @@ class sm_frbus():
         # Run mcontrol to match the target variables to their trajectories
         no_stayhome_result = self.model.mcontrol(start_quarter, end_quarter, no_stayhome_data, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
         no_stayhome_result = self.model.solve(end_quarter+1, self.end, no_stayhome_result)
-        # no_stayhome_result = self.model.mcontrol(end_quarter+1, self.end, no_stayhome_result, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
+        # no_stayhome_result = self.model.mcontrol(end_stayhome+1, self.end, no_stayhome_result, targ_no_stayhome, traj_no_stayhome, inst_no_stayhome)
 
-        # no_stayhome_result = self.model.solve(self.start, self.end, no_stayhome_data, {'maxit':200})
         return no_stayhome_result
 
-    def cal_stayhome_anticipated_errors(self, start_stayhome_week=12, duration=7, end_stayhome=pd.Period("2020Q2")):
+    def cal_stayhome_anticipated_errors(self, start_stayhome_week=12, duration=6, end_stayhome=pd.Period("2020Q2")):
         if self.no_stayhome is None:
             raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
         stayhome_aerr_data = self.no_stayhome.copy(deep=True)
-        # stayhome_aerr_data = stayhome_aerr_data.loc[:, ~stayhome_aerr_data.columns.str.contains('_trac')]
-        
-        # common_columns = stayhome_aerr_data.columns.intersection(self.data.columns)
-        # stayhome_aerr_data = stayhome_aerr_data[common_columns]
-
-
-        # trac_columns = stayhome_aerr_data.columns[stayhome_aerr_data.columns.str.contains('_trac')]
-        # stayhome_aerr_data[trac_columns] = 0
 
         start_stayhome = self.week_to_quarter(start_stayhome_week) 
         end_stayhome = self.week_to_quarter(start_stayhome_week + duration)
 
         # stayhome_aerr_data.loc[start_stayhome:end_stayhome, "leh_t"] = (stayhome_aerr_data.loc[start_stayhome:end_stayhome, 'leh'] + 
         #  self.calculate_quarterly_average(start_value_leh = stayhome_aerr_data.loc[start_stayhome-1, 'leh'], start_week = start_stayhome_week, duration = duration)[1])
-        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "leh_t"] = (
-        self.calculate_quarterly_average(start_value_leh = stayhome_aerr_data.loc[start_stayhome-1, 'leh'], start_week = start_stayhome_week, duration = duration)[0])
+        
+        stayhome_aerr_data.loc[start_stayhome:end_stayhome, "leh_t"] = ( 
+         self.calculate_quarterly_average(start_value_leh = stayhome_aerr_data.loc[start_stayhome-1, 'leh'], start_week = start_stayhome_week, duration = duration)[0])
 
         stayhome_aerr = self.model.mcontrol(start_stayhome, end_stayhome, stayhome_aerr_data, ['leh'], ['leh_t'], ['leh'])
         stayhome_aerr = self.model.solve(end_stayhome+1, self.end, stayhome_aerr)
@@ -197,12 +174,7 @@ class sm_frbus():
         for name in self.variables['name']:
             try:
                 stayhome_aerr.loc[self.start:self.end, f"{name}_aerr"] = self.data.loc[self.start:self.end, name] - stayhome_aerr.loc[self.start:self.end, name]
-                # stayhome_aerr[f"{name}_error"] = self.data[name] - stayhome_aerr.loc[name]
-
-                if stayhome_aerr[f"{name}_aerr"].isna().sum()!=0:
-                    pass
-                    # print("\n DMMM", name)
-                # control.loc[self.start:self.end, f"{name}"] += stayhome_aerr.loc[self.start:self.end, f"{name}_error"]
+                control.loc[self.start:self.end, f"{name}"] += stayhome_aerr.loc[self.start:self.end, f"{name}_aerr"]
             except Exception as e:
                 if self.verbose == "full":
                     print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
@@ -216,10 +188,8 @@ class sm_frbus():
         if self.verbose!=False:
             print("Creating custom stay-at-home orders scenario...")
         if not targ_custom or not traj_custom or not inst_custom:
-            # print("No custom targets, trajectories and instruments provided. Using default empty values.")
+            print("No custom targets, trajectories and instruments provided. Using default empty values.")
             targ_custom, traj_custom, inst_custom = [], [], []
-
-            # custom_stayhome_data, targ_custom, traj_custom, inst_custom = self.trac_const_variables()
 
         # print("\n", start_lockdown_opt,"\n")
         end_lockdown_quarter = self.week_to_quarter(start_lockdown_opt + custom_lockdown_duration)        
@@ -228,7 +198,7 @@ class sm_frbus():
         
         targ_custom += ['leh',]
         traj_custom += ['leh_t', ]
-        inst_custom += ['leh',]
+        inst_custom += ['leh_aerr',]
 
         if custom_stayhome_data is None:
             print("No custom stayhome data provided. Using default values.")
@@ -236,56 +206,29 @@ class sm_frbus():
                 raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
             custom_stayhome_data = self.no_stayhome.copy(deep=True)
 
-
-            # Drop columns with '_trac' in their names
-            # custom_stayhome_data = custom_stayhome_data.loc[:, ~custom_stayhome_data.columns.str.contains('_trac')]
-            # Identify columns with '_trac' in their names and fill them with zeroes
-            # trac_columns = custom_stayhome_data.columns[custom_stayhome_data.columns.str.contains('_trac')]
-            # custom_stayhome_data[trac_columns] = 0
-            # common_columns = custom_stayhome_data.columns.intersection(self.data.columns)
-            # custom_stayhome_data = custom_stayhome_data[common_columns]
-
-
-
-        print("\n\nDATA SHAPE", self.data.shape)
-        print("NO SAH SHAPE", self.no_stayhome.shape)
-        print("CUSTOM SHAPE", custom_stayhome_data.shape)
-
-        # custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_aerr"] = (custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, 'leh_aerr'] + 
+        # custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, 'leh'] + 
         #  self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[1])
 
         custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"] = (
          self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[0])
 
 
-        # print("\n\n", custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"], "\n\n")
+        print("\n\n", custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"], "\n\n")
 
-        custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, targ_custom, traj_custom, inst_custom)
-        custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome)
+        custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, targ_custom, traj_custom, inst_custom, {'maxit':5000})
+        custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome, {'maxit':1000})
 
-        # custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, ["leh"], ['leh_t'], ['leh'])
-        # custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome)
-        # custom_stayhome = self.model.mcontrol(self.start, self.end, custom_stayhome, targ_custom, traj_custom, inst_custom)
-
-        # custom_stayhome = self.model.solve(self.start, self.end, custom_stayhome_data, {'maxit':1000})
-
-
-        print("\n\nCUSTOM SHAPE2", custom_stayhome.shape)
-        print("AERR SHAPE", self.stayhome_anticipated_errors.shape)
         # Apply anticipated errors
         for name in self.variables['name']:
             try:
-                if custom_stayhome[name].isna().sum()!=0:
-                    print("pre-empty:", name, "\n")
-                custom_stayhome.loc[self.start:self.end, name] += self.stayhome_anticipated_errors.loc[self.start:self.end, f"{name}_aerr"]
-                if custom_stayhome[name].isna().sum()!=0:
-                    print("post-empty:", name)
+                custom_stayhome[name] += self.stayhome_anticipated_errors[f"{name}_aerr"]
             except Exception as e:
                 if self.verbose:
                     print(f"Can't calculate anticipated error for variable '{name}', exception message: {e}")
 
         self.custom_stayhome = custom_stayhome
         return custom_stayhome
+
 
     def link_sm_frbus(self, df):
         """
@@ -320,6 +263,7 @@ class sm_frbus():
             raise Exception("No custom stayhome scenario has been solved yet. Please run solve_custom_stayhome() first.")
         # xgdpn = GDP, current $ is in the thousands (10^3), fit with https://data.worldbank.org/indicator/NY.GDP.MKTP.CD?locations=US
         # trillion dollars = 10^12 dollars
+        self.loss_df = (self.custom_stayhome['xgdp'] - self.no_stayhome['xgdp']) * (10**9)
         return (self.custom_stayhome['xgdp'] - self.no_stayhome['xgdp']).sum() * (10**9)/4 # avg gdp loss per year
 
     def save_results(self, path="./results/dynamic_labor_consumption/"):
@@ -332,11 +276,11 @@ class sm_frbus():
     def plot_results(self):
         # Generate plots
         dfs = {
-             'baseline': self.data,
-             'custom_stayhome': self.custom_stayhome,
+            #  'baseline': self.data,
              'no_stayhome': self.no_stayhome,
-             'no_pandemic': self.no_pandemic,
-             'control': self.control
+             'custom_stayhome': self.custom_stayhome,
+            #  'no_pandemic': self.no_pandemic,
+            #  'control': self.control
              }
 
         plots = [
@@ -372,27 +316,187 @@ class sm_frbus():
         custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/export+import.png', plot_title='No April lockdown + same foreign variables')
 
 
+        # plots = [
+        #     {'column': 'xgdp', 'type': 'value'},
+        #     {'column': 'pcxfe', 'type': 'pct_change', 'name': 'PCE Price Index'},
+        #     {'column': 'leh', },
+        #     {'column': 'pcpi', 'type': 'pct_change', 'name': 'CPI'}
+        # ]
+        # custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')
+
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from typing import List
+
+def aggregate_and_plot_yearly(series_list: List[pd.Series], series_names: List[str] = None, save_path=None):
+    if series_names is None:
+        series_names = [f'Series {i+1}' for i in range(len(series_list))]
+    
+    if len(series_list) != len(series_names):
+        raise ValueError("Number of Series must match number of Series names")
+
+    plt.figure(figsize=(12, 6))
+
+    for series, name in zip(series_list, series_names):
+        # Convert index to PeriodIndex if it's not already
+        if not isinstance(series.index, pd.PeriodIndex):
+            series.index = pd.PeriodIndex(series.index, freq='Q')
+        
+        # Resample to yearly frequency and sum
+        yearly_data = series.resample('Y').sum()
+        
+        # Plot the yearly data
+        plt.plot(yearly_data.index.year, yearly_data.values, marker='o', label=name)
+
+    plt.title('Yearly Sums of Multiple Series')
+    plt.xlabel('Year')
+    plt.ylabel('Yearly Sum')
+    plt.legend()
+
+    # Format x-axis to show only years
+    plt.gca().xaxis.set_major_locator(plt.matplotlib.ticker.MaxNLocator(integer=True))
+    plt.tight_layout()
+    plt.show()
+    if save_path:
+        plt.savefig(save_path)
+
+
+    # Print the yearly sums for verification
+    for series, name in zip(series_list, series_names):
+        print(f"\nYearly sums for {name}:")
+        yearly_sums = series.resample('Y').sum()
+        print(yearly_sums)
+
+# Example usage:
+# Assuming you have series df1, df2, df3
+# plot_last_10_rows([df1, df2, df3], ['Sales Data', 'Stock Prices', 'Weather Data'])
+
+# To use with a single DataFrame:
+# plot_last_10_rows([df1], ['My DataFrame'])
+
+
+
+
+def plot_yearly_series_subplots(series_list: List[pd.Series], series_names: List[str] = None, save_path: str = None):
+    if series_names is None:
+        series_names = [f'Series {i+1}' for i in range(len(series_list))]
+    
+    # Combine all series into a single DataFrame
+    df = pd.concat([series.rename(name) for series, name in zip(series_list, series_names)], axis=1)
+    df.index = pd.PeriodIndex(df.index, freq='Q')
+    
+    # Group by year and sum
+    yearly_data = df.groupby(df.index.year).sum()
+    
+    # Create a subplot for each year
+    num_years = len(yearly_data)
+    fig, axs = plt.subplots(1, num_years, figsize=(5*num_years, 6), sharey=True)
+    if num_years == 1:
+        axs = [axs]
+    
+    for i, (year, data) in enumerate(yearly_data.iterrows()):
+        ax = axs[i]
+        x = np.arange(len(series_names))
+        for j, (name, value) in enumerate(data.items()):
+            print()
+            ax.scatter(x[j], value, label=name if i == 0 else "")
+
+        print("year",year)
+        print("data",data)
+        ax.set_title(f'Year {year}')
+        ax.set_xticks(x)
+        ax.set_xticklabels(series_names, rotation=45, ha='right')
+        
+        # Add value labels above each point
+        for j, value in enumerate(data.values):
+            print("j",j)
+            print("value",value)
+            ax.annotate(f'{value:.2e}', (x[j], value), xytext=(0, 5), 
+                        textcoords='offset points', ha='center', va='bottom')
+    
+    # Set common labels
+    fig.text(0.5, 0.02, 'Series', ha='center', va='center')
+    fig.text(0.02, 0.5, 'Yearly Sum', ha='center', va='center', rotation='vertical')
+    
+    plt.suptitle('Yearly Sums of Multiple Series', fontsize=16)
+    plt.tight_layout(rect=[0.03, 0.03, 1, 0.95])  # Adjust layout to accommodate common labels
+    
+    # Add a single legend for all subplots
+    handles, labels = axs[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(0.99, 0.99))
+    
+    if save_path:
+        plt.savefig(save_path)
+    plt.show()
+
+
+
+
 def main():
-    obj = sm_frbus()
+    obj1 = sm_frbus()
     sm_df = pd.read_csv("../../sir_macro/csv/td2.csv")
     # custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(sm_df)
     # obj.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=7,
     #                             custom_stayhome_data=custom_stayhome_data,
     #                             targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
 
-    obj.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=7)
+    # obj1.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=7)
+    # # obj.plot_results()
+    # loss1 = obj1.loss_econ() 
+    obj2 = sm_frbus()
+    obj2.solve_custom_stayhome(start_lockdown_opt=1, custom_lockdown_duration=1)
     # obj.plot_results()
-    loss1 = obj.loss_econ() 
-
-    obj.solve_custom_stayhome(start_lockdown_opt=3, custom_lockdown_duration=13)
-    # obj.plot_results()
-    loss2 = obj.loss_econ() 
-    obj.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=14)
-    loss3 = obj.loss_econ() 
-    obj.plot_results()
-    print(loss1)
+    loss2 = obj2.loss_econ()
+    obj3 = sm_frbus() 
+    obj3.solve_custom_stayhome(start_lockdown_opt=5, custom_lockdown_duration=12)
+    loss3 = obj3.loss_econ() 
+    obj3.plot_results()
+    # print(loss1)
     print(loss2)
     print(loss3)
+
+    print(obj2.loss_df.tail(5))
+
+    print(obj3.loss_df.index)
+    print(obj3.loss_df.values)
+
+    fig, ax = plt.subplots(2, 1, figsize=(13, 12))
+    plt.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.95, hspace=.15)
+
+    # plt.figure(figsize=(12, 6))
+
+    x = obj3.custom_stayhome.tail(18).index.astype(str)
+    y0 = (obj3.custom_stayhome.tail(18)["xgdp"].values - obj2.no_stayhome.tail(18)['xgdp'].values)/(10**3)
+    ax[0].plot(x, y0, marker='o', label="Optimal SAH", color='firebrick', alpha=0.8)
+    ax[0].set_title('GDP Compared to no SAH')
+    ax[0].set_ylabel('GDP Loss (in Trillion USD)')
+
+    y1 = (obj3.custom_stayhome.tail(18)["leh"].values - obj2.no_stayhome.tail(18)['leh'].values)
+    ax[1].plot(x, y1, marker='o', label="Optimal SAH", color='coral', alpha=0.8)
+    ax[1].set_title('Civilian Employment Compared to no SAH')
+    ax[1].set_ylabel('Civilian Employment Loss (in Million)')
+
+
+
+    for i in range(2):
+        ax[i].set_facecolor('aliceblue')
+        ax[i].spines['top'].set_visible(False)
+        ax[i].spines['right'].set_visible(False)
+        ax[i].axhline(y=0, color='grey', linestyle='--')
+        ax[i].grid(color='lightgray', linestyle='-', linewidth=0.5)
+        ax[i].yaxis.grid(True)
+        ax[i].xaxis.grid(False)
+        ax[i].legend()
+
+    plt.tight_layout(h_pad=2)
+    plt.show()
+    plt.savefig("econ_SAH_5_12.png")
+
+
+    aggregate_and_plot_yearly([obj2.loss_df.tail(12), obj3.loss_df.tail(12)], ['3-13', '12-14'], "xoa1.png")
+
+    plot_yearly_series_subplots([obj2.loss_df.tail(12), obj3.loss_df.tail(12)], "xoa2.png")
 
     print("conmeo", pd.Period("2020Q2")-1)
 

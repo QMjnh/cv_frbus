@@ -27,24 +27,25 @@ def cal_yld_precise(num_infected, num_mild, num_severe, num_critical, weights='d
       }
 
   duration = {
-      # 'asym2rec': 8.0
-      'inf2sym': 1.1,
-      'sym2sev' : 6.6,
-      'sev2crit': 1.5,
-      'mild2rec': 8.0,
-      'sev2rec': 18.1,
-      'crit2rec': 18.1,
-      'crit2die': 10.7,
-      'post_acute': 41
+      # 'asym2rec': 8.0/365
+      'inf2sym': (1.1/365),
+      'sym2sev' : (6.6/365),
+      'sev2crit': (1.5/365),
+      'mild2rec': (8.0/365),
+      'sev2rec': (18.1/365),
+      'crit2rec': (18.1/365),
+      'crit2die': (10.7/365),
+      'post_acute': (41/365)
       #source: https://github.com/InstituteforDiseaseModeling/covasim/blob/main/covasim/parameters.py
       # https://www.nature.com/articles/s41591-021-01292-y
   }
-
+  print("duration: ",duration)
   proportions = {
     'post_acute': .133}
 
   yld_mild2rec = num_mild * duration['mild2rec'] * weights['mild_moderate']
-
+  print("num_mild: ",num_mild)
+  print("yld_mild2rec: ",yld_mild2rec)
   yld_mild2sev = num_mild * duration['sym2sev'] * weights['mild_moderate']
   yld_sev2rec = yld_mild2sev + num_severe * duration['sev2rec'] * weights['severe']
 
@@ -76,15 +77,15 @@ def cal_yld_avg(num_infected, weights='default'):
       }
 
   duration = {
-      # 'asym2rec': 8.0
-      'inf2sym': 1.1,
-      'sym2sev' : 6.6,
-      'sev2crit': 1.5,
-      'mild2rec': 8.0,
-      'sev2rec': 18.1,
-      'crit2rec': 18.1,
-      'crit2die': 10.7,
-      'post_acute': 41
+      # 'asym2rec': 8.0/365
+      'inf2sym': (1.1/365),
+      'sym2sev' : (6.6/365),
+      'sev2crit': (1.5/365),
+      'mild2rec': (8.0/365),
+      'sev2rec': (18.1/365),
+      'crit2rec': (18.1/365),
+      'crit2die': (10.7/365),
+      'post_acute': (41/365)
       #source: https://github.com/InstituteforDiseaseModeling/covasim/blob/main/covasim/parameters.py
       # https://www.nature.com/articles/s41591-021-01292-y
   }

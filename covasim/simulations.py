@@ -153,15 +153,15 @@ class Covasim():
         # convert week to pd.Timestamp -> datetime -> str
         return end_date.date().strftime('%Y-%m-%d')
 
-    def custom_sim(self, start_stayhome, duration_stayhome):
+    def custom_sim(self, start_stayhome, duration_stayhome, reduced_beta=0.5, save_csv = None):
         # transmission rate = beta = 0.13
 
         start_stayhome_date = self.week_to_date(start_stayhome)
         end_stayhome_date = self.week_to_date(start_stayhome + duration_stayhome)
-        print("start-end covasim",start_stayhome_date, end_stayhome_date)
+        # print("start-end covasim",start_stayhome_date, end_stayhome_date)
 
         # Define sim with simulations:
-        lockdown = cv.change_beta(days=[start_stayhome_date, end_stayhome_date], changes=[0.3, 1.0], show_label=True, label="SAH Period") # 0.4 means reduce transmission rate by 60% to 0.4
+        lockdown = cv.change_beta(days=[start_stayhome_date, end_stayhome_date], changes=[reduced_beta, 1.0], show_label=True, label="SAH Period") # 0.4 means reduce transmission rate by 60% to 0.4
         dummy = cv.change_beta(days=['2020-12-13'], changes=[1.0], show_label=False, label="Start Vaccination", line_args={'color': 'tab:blue'}, do_plot=False) # dummy intervention to mark the start of vaccination
         test = self.testing_historical()
         ct = cv.contact_tracing(trace_probs=dict(h=1.0, s=0.5, w=0.5, c=0.3), do_plot=False)
@@ -173,16 +173,17 @@ class Covasim():
         sim = cv.Sim(self.pars, interventions=interventions, label='Custom-SAH')
         sim.run()
         self.custom_sim_obj = sim
+
         with_interventions = sim.to_df()
         self.custom_stayhome_res = with_interventions
-        with_interventions.to_csv('with-interventions.csv', index=False)
 
-        # print(self.custom_stayhome_res)
+        if save_csv:
+            with_interventions.to_csv('with-interventions.csv', index=False)
+
 
         return self.custom_stayhome_res
 
-    # def plot(self, do_save=False, fig_path=""):
-    #     return self.custom_stayhome_res.plot(do_save=True)
+
 
 
 

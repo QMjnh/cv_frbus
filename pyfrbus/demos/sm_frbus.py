@@ -3,6 +3,9 @@ from pyfrbus.frbus import Frbus
 from pyfrbus.load_data import load_data
 from pyfrbus.custom_plot import custom_plot
 import numpy as np
+import matplotlib.pyplot as plt
+from typing import List
+
 
 class sm_frbus():
     def __init__(self, start="2019Q4", end="2023Q4",
@@ -15,7 +18,7 @@ class sm_frbus():
         self.verbose = verbose
         self.start = start
         self.end = end
-        self.real_stayhome = 8 # weeks that the stay-at-home orders is in effect in real life
+        # self.real_stayhome = 8 # weeks that the stay-at-home orders is in effect in real life
         self.variables = pd.read_csv("/home/mlq/fed model/pyfrbus/demos/model architecture/model_variables_simple.csv")
         self.dynamic_variables = self.variables[(self.variables["sector"] == "Labor Market") | (self.variables["sector"] == "Household Expenditures")
                             | (self.variables["sector"] == "Aggregate Output Identities")].name
@@ -113,8 +116,8 @@ class sm_frbus():
         delta_leh = pd.concat([pd.Series(start_value_leh), quarterly_avg_leh])
         delta_leh = delta_leh.diff().dropna()
 
-        print("\n\nquarter leh", quarterly_avg_leh)
-        print("\ndelta", delta_leh)
+        # print("\n\nquarter leh", quarterly_avg_leh)
+        # print("\ndelta", delta_leh)
 
         # Return the quarterly averages and weekly series for verification
         return quarterly_avg_leh, delta_leh, start_value_leh
@@ -316,155 +319,22 @@ class sm_frbus():
         custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/export+import.png', plot_title='No April lockdown + same foreign variables')
 
 
-        # plots = [
-        #     {'column': 'xgdp', 'type': 'value'},
-        #     {'column': 'pcxfe', 'type': 'pct_change', 'name': 'PCE Price Index'},
-        #     {'column': 'leh', },
-        #     {'column': 'pcpi', 'type': 'pct_change', 'name': 'CPI'}
-        # ]
-        # custom_plot(dfs, '2020Q1', '2023Q4', plots, self.variables, '/home/mlq/fed model/pyfrbus/demos/results/dynamic_labor_consumption/gdp+inflation.png', plot_title='No April lockdown + same foreign variables')
-
-
-import matplotlib.pyplot as plt
-import pandas as pd
-from typing import List
-
-def aggregate_and_plot_yearly(series_list: List[pd.Series], series_names: List[str] = None, save_path=None):
-    if series_names is None:
-        series_names = [f'Series {i+1}' for i in range(len(series_list))]
-    
-    if len(series_list) != len(series_names):
-        raise ValueError("Number of Series must match number of Series names")
-
-    plt.figure(figsize=(12, 6))
-
-    for series, name in zip(series_list, series_names):
-        # Convert index to PeriodIndex if it's not already
-        if not isinstance(series.index, pd.PeriodIndex):
-            series.index = pd.PeriodIndex(series.index, freq='Q')
-        
-        # Resample to yearly frequency and sum
-        yearly_data = series.resample('Y').sum()
-        
-        # Plot the yearly data
-        plt.plot(yearly_data.index.year, yearly_data.values, marker='o', label=name)
-
-    plt.title('Yearly Sums of Multiple Series')
-    plt.xlabel('Year')
-    plt.ylabel('Yearly Sum')
-    plt.legend()
-
-    # Format x-axis to show only years
-    plt.gca().xaxis.set_major_locator(plt.matplotlib.ticker.MaxNLocator(integer=True))
-    plt.tight_layout()
-    plt.show()
-    if save_path:
-        plt.savefig(save_path)
-
-
-    # Print the yearly sums for verification
-    for series, name in zip(series_list, series_names):
-        print(f"\nYearly sums for {name}:")
-        yearly_sums = series.resample('Y').sum()
-        print(yearly_sums)
-
-# Example usage:
-# Assuming you have series df1, df2, df3
-# plot_last_10_rows([df1, df2, df3], ['Sales Data', 'Stock Prices', 'Weather Data'])
-
-# To use with a single DataFrame:
-# plot_last_10_rows([df1], ['My DataFrame'])
-
-
-
-
-def plot_yearly_series_subplots(series_list: List[pd.Series], series_names: List[str] = None, save_path: str = None):
-    if series_names is None:
-        series_names = [f'Series {i+1}' for i in range(len(series_list))]
-    
-    # Combine all series into a single DataFrame
-    df = pd.concat([series.rename(name) for series, name in zip(series_list, series_names)], axis=1)
-    df.index = pd.PeriodIndex(df.index, freq='Q')
-    
-    # Group by year and sum
-    yearly_data = df.groupby(df.index.year).sum()
-    
-    # Create a subplot for each year
-    num_years = len(yearly_data)
-    fig, axs = plt.subplots(1, num_years, figsize=(5*num_years, 6), sharey=True)
-    if num_years == 1:
-        axs = [axs]
-    
-    for i, (year, data) in enumerate(yearly_data.iterrows()):
-        ax = axs[i]
-        x = np.arange(len(series_names))
-        for j, (name, value) in enumerate(data.items()):
-            print()
-            ax.scatter(x[j], value, label=name if i == 0 else "")
-
-        print("year",year)
-        print("data",data)
-        ax.set_title(f'Year {year}')
-        ax.set_xticks(x)
-        ax.set_xticklabels(series_names, rotation=45, ha='right')
-        
-        # Add value labels above each point
-        for j, value in enumerate(data.values):
-            print("j",j)
-            print("value",value)
-            ax.annotate(f'{value:.2e}', (x[j], value), xytext=(0, 5), 
-                        textcoords='offset points', ha='center', va='bottom')
-    
-    # Set common labels
-    fig.text(0.5, 0.02, 'Series', ha='center', va='center')
-    fig.text(0.02, 0.5, 'Yearly Sum', ha='center', va='center', rotation='vertical')
-    
-    plt.suptitle('Yearly Sums of Multiple Series', fontsize=16)
-    plt.tight_layout(rect=[0.03, 0.03, 1, 0.95])  # Adjust layout to accommodate common labels
-    
-    # Add a single legend for all subplots
-    handles, labels = axs[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(0.99, 0.99))
-    
-    if save_path:
-        plt.savefig(save_path)
-    plt.show()
-
-
-
-
 def main():
-    obj1 = sm_frbus()
-    sm_df = pd.read_csv("../../sir_macro/csv/td2.csv")
-    # custom_stayhome_data, targ_custom, traj_custom, inst_custom = obj.link_sm_frbus(sm_df)
-    # obj.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=7,
-    #                             custom_stayhome_data=custom_stayhome_data,
-    #                             targ_custom=targ_custom, traj_custom=traj_custom, inst_custom=inst_custom)
-
-    # obj1.solve_custom_stayhome(start_lockdown_opt=12, custom_lockdown_duration=7)
-    # # obj.plot_results()
-    # loss1 = obj1.loss_econ() 
+    # no-stayhome scenario
     obj2 = sm_frbus()
     obj2.solve_custom_stayhome(start_lockdown_opt=1, custom_lockdown_duration=1)
-    # obj.plot_results()
     loss2 = obj2.loss_econ()
+
+    # optimal stayhome scenario
     obj3 = sm_frbus() 
     obj3.solve_custom_stayhome(start_lockdown_opt=5, custom_lockdown_duration=12)
     loss3 = obj3.loss_econ() 
     obj3.plot_results()
-    # print(loss1)
-    print(loss2)
-    print(loss3)
 
-    print(obj2.loss_df.tail(5))
-
-    print(obj3.loss_df.index)
-    print(obj3.loss_df.values)
 
     fig, ax = plt.subplots(2, 1, figsize=(13, 12))
     plt.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.95, hspace=.15)
 
-    # plt.figure(figsize=(12, 6))
 
     x = obj3.custom_stayhome.tail(18).index.astype(str)
     y0 = (obj3.custom_stayhome.tail(18)["xgdp"].values - obj2.no_stayhome.tail(18)['xgdp'].values)/(10**3)
@@ -493,12 +363,6 @@ def main():
     plt.show()
     plt.savefig("econ_SAH_5_12.png")
 
-
-    aggregate_and_plot_yearly([obj2.loss_df.tail(12), obj3.loss_df.tail(12)], ['3-13', '12-14'], "xoa1.png")
-
-    plot_yearly_series_subplots([obj2.loss_df.tail(12), obj3.loss_df.tail(12)], "xoa2.png")
-
-    print("conmeo", pd.Period("2020Q2")-1)
 
 if __name__ == "__main__":
     main()

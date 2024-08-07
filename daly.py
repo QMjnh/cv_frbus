@@ -39,13 +39,11 @@ def cal_yld_precise(num_infected, num_mild, num_severe, num_critical, weights='d
       #source: https://github.com/InstituteforDiseaseModeling/covasim/blob/main/covasim/parameters.py
       # https://www.nature.com/articles/s41591-021-01292-y
   }
-  print("duration: ",duration)
   proportions = {
     'post_acute': .133}
 
   yld_mild2rec = num_mild * duration['mild2rec'] * weights['mild_moderate']
-  print("num_mild: ",num_mild)
-  print("yld_mild2rec: ",yld_mild2rec)
+
   yld_mild2sev = num_mild * duration['sym2sev'] * weights['mild_moderate']
   yld_sev2rec = yld_mild2sev + num_severe * duration['sev2rec'] * weights['severe']
 
@@ -138,9 +136,6 @@ def cal_daly_avg(num_infected, num_death):
 def cal_econ_daly_avg(covasim_result_df, price_per_daly=95075):
   num_infected, num_death = covasim_result_df['I'].sum(), covasim_result_df['D'].sum()
   return cal_daly_avg(num_infected, num_death) * price_per_daly
-
-
-
 
 
 def cal_daly_precise(num_infected, num_mild, num_severe, num_critical, num_death):

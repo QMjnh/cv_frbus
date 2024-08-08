@@ -34,6 +34,9 @@ class sm_frbus():
         self.stayhome_anticipated_errors = self.cal_stayhome_anticipated_errors()
         self.custom_stayhome = None
     def solve_no_pandemic(self):
+        """
+        Solve the model for the no pandemic scenario
+        """
         if self.verbose!=False:
             print("Solving for no pandemic scenario...")
         result = self.model.solve(self.start, self.end, self.data)
@@ -216,7 +219,7 @@ class sm_frbus():
          self.calculate_quarterly_average(start_value_leh = custom_stayhome_data.loc[start_lockdown_quarter-1, 'leh'], start_week = start_lockdown_opt, duration = custom_lockdown_duration)[0])
 
 
-        print("\n\n", custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"], "\n\n")
+        # print("\n\n", custom_stayhome_data.loc[start_lockdown_quarter:end_lockdown_quarter, "leh_t"], "\n\n")
 
         custom_stayhome = self.model.mcontrol(start_lockdown_quarter, end_lockdown_quarter, custom_stayhome_data, targ_custom, traj_custom, inst_custom, {'maxit':5000})
         custom_stayhome = self.model.solve(end_lockdown_quarter+1, self.end, custom_stayhome, {'maxit':1000})

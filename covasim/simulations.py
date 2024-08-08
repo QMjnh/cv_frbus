@@ -13,7 +13,7 @@ class Covasim():
         self.start_stayhome = None
         self.duration_stayhome = None
         self.pars = dict(
-                pop_size  = 1_000_000,
+                pop_size  = 1_0_00,
                 start_day = '2020-01-05',
                 end_day   = '2023-12-31',
                 pop_type  = 'hybrid',

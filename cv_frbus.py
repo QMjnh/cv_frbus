@@ -47,7 +47,7 @@ class cv_frbus():
             self.loss_econ_daly = cal_econ_daly_precise(self.covasim_res)*scale_factor
             self.loss_total = self.loss_gdp + self.loss_econ_daly
             # print("\n\nconcho\n", self.loss_gdp + loss_econ_daly)
-            print("Writing to log file")
+            print("Writing to log to file: {}".format(log_file))
             log.write(f"{self.loss_gdp},{self.loss_econ_daly},{self.loss_total},{self.start_stayhome},{self.duration_stayhome}\n")
 
         return self.loss_total
@@ -55,12 +55,12 @@ class cv_frbus():
     def run(self, start_stayhome, duration_stayhome):
         self.start_stayhome = start_stayhome
         self.duration_stayhome = duration_stayhome
-        print("start-end main",self.start_stayhome, self.duration_stayhome)
+        # print("start-end main",self.start_stayhome, self.duration_stayhome)
         self.run_frbus()
         self.run_covasim()
         self.cal_loss_total()
 
-        print("\n\nconmeo\n\n",abs(self.loss_total))
+        # print("\n\nconmeo\n\n",abs(self.loss_total))
 
         return abs(self.loss_total)
         
@@ -99,75 +99,15 @@ def main():
     obj.run(5,12)
     # obj.optimize_parallel()
     # obj.optimize()
-    # print(obj.loss_total())
     obj.frbus_obj.plot_results()
 
-    print("\n\nXGDP:", (obj.frbus_obj.custom_stayhome - obj.frbus_obj.data)["xgdp"].sum())
 
-    print("\n\nXGDPN:", (obj.frbus_obj.custom_stayhome - obj.frbus_obj.data)["xgdpn"].sum())
-
-
-
-
-    # obj.covasim_obj.orig_sim()
-
-
-    obj.covasim_obj.custom_stayhome_res.to_csv('SAH_5_12_30per.csv', index=False)
-    # obj.covasim_obj.orig_sim_obj.to_df().to_csv('no_SAH_5_8.csv', index=False)
-
-
+    obj.covasim_obj.custom_stayhome_res.to_csv('xoa.csv', index=False)
+    print("\nLoss_GDP,Loss_DALY,Loss_total,Start_week,Duration")
     print(f"{obj.loss_gdp},{obj.loss_econ_daly},{obj.loss_total},{obj.start_stayhome},{obj.duration_stayhome}\n")
 
     
-    # cv.plot_compare(obj.covasim_obj.custom_stayhome_res, do_save=True)
 
-    
-    cv_fig = obj.covasim_obj.custom_sim_obj.plot(do_save=True)
-
-
-
-
-
-    # s1 = cv.Sim(beta=0.01, label='Low')
-    # s2 = cv.Sim(beta=0.02, label='High')
-    # cv.parallel(obj.covasim_obj.orig_sim_obj, obj.covasim_obj.custom_sim_obj).plot(do_save=True)
-    # msim = cv.parallel([s1, s2], keep_people=True)
-
-
-    msim = cv.MultiSim([obj.covasim_obj.orig_sim_obj, obj.covasim_obj.custom_sim_obj])
-    msim_fig = msim.plot()
-
-
-    # from datetime import datetime
-
-    # # Assuming msim_fig is your existing figure with subplots
-    # fig = msim_fig.figure
-
-    # # Convert the date string to a datetime object
-    # vax_start_date = datetime.strptime('2020-12-13', '%Y-%m-%d')
-
-    # # Add vertical line to each subplot
-    # for ax in fig.axes:
-    #     ax.axvline(x=vax_start_date, color='gray', linestyle='--', linewidth=1, label='Start Vaccination')
-
-    # # Adjust the legend to include the new line
-    # handles, labels = ax.get_legend_handles_labels()
-    # ax.legend(handles, labels, loc='best')
-
-    # # Update the x-axis to ensure the new line is visible
-    # for ax in fig.axes:
-    #     ax.set_xlim(left=min(ax.get_xlim()[0], mdates.date2num(vax_start_date)))
-
-    # # Redraw the figure
-    # fig.canvas.draw()
-
-    # Save the figure
-    # fig.savefig('msim6-5.png', dpi=300, bbox_inches='tight')
-
-    cv_fig.savefig('covasim_plot.png', dpi=300, bbox_inches='tight')
-
-    cv.savefig(fig=msim_fig, filename="msim5-8.png", dpi=300)
-    print(f"{obj.loss_gdp},{obj.loss_econ_daly},{obj.loss_total},{obj.start_stayhome},{obj.duration_stayhome}\n")
 
 
 

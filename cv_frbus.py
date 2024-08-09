@@ -39,7 +39,7 @@ class cv_frbus():
 
     def cal_loss_total(self):
         scale_factor = 331000000/self.covasim_obj.pars['pop_size']
-        log_file = 'loss_log.txt'
+        log_file = '/home/mlq/fed model/results/loss_log.txt'
         with open(log_file, 'a') as log:
             log.write("Loss_GDP,Loss_DALY,Loss_total,Start_week,Duration\n")  # Write header
             self.loss_econ_daly = cal_econ_daly_precise(self.covasim_res)*scale_factor
@@ -94,7 +94,7 @@ def main():
     obj.frbus_obj.plot_results()
 
 
-    obj.covasim_obj.custom_stayhome_res.to_csv('SAH_4_15.csv', index=False)
+    obj.covasim_obj.custom_stayhome_res.to_csv('./results/SAH_4_15.csv', index=False)
     print("\nLoss_GDP,Loss_DALY,Loss_total,Start_week,Duration")
     print(f"{obj.loss_gdp},{obj.loss_econ_daly},{obj.loss_total},{obj.start_stayhome},{obj.duration_stayhome}\n")
 

@@ -3,7 +3,7 @@ import io
 import numpy as np
 
 
-with open('/home/mlq/fed model/result_spc.txt', 'r') as file:
+with open('/home/mlq/fed model/result/result_spc.txt', 'r') as file:
     data = file.read()
 
 # Function to process the data

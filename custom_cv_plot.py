@@ -3,9 +3,8 @@ import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-# df_orig = pd.read_csv("/home/mlq/fed model/no-SAH.csv")
-df_orig = pd.read_csv("/home/mlq/fed model/covasim/no-SAH_new.csv")
-df_sah = pd.read_csv("/home/mlq/fed model/SAH_5_15.csv")
+df_orig = pd.read_csv("/home/mlq/fed model/results/no-SAH.csv")
+df_sah = pd.read_csv("/home/mlq/fed model/results/SAH_5_15.csv")
 
 
 
@@ -82,5 +81,4 @@ for i in range(4):
 
 
 plt.show()
-# plt.savefig('SAH_5_12_30per_aerr.png')
-plt.savefig('new_SAH_5_15.png')
+plt.savefig('./resutls/SAH_5_12_30per_aerr.png')

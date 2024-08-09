@@ -27,23 +27,13 @@ class Covasim():
         """
         Simulate the pandemic scenario without SAH interventions
         """
-        # Define sim with simulations:
-        dummy = cv.change_beta(days=['2020-12-13'], changes=[1.0], show_label=False, label="Start Vaccination", line_args={'color': 'tab:blue'}, do_plot=False) # dummy intervention to mark the start of vaccination
-        test = self.testing_historical()
-        ct = cv.contact_tracing(trace_probs=dict(h=1.0, s=0.5, w=0.5, c=0.3), do_plot=False)
-        vax_campaigns = self.vax_simple()
-        interventions = [test, ct, dummy] + vax_campaigns
-
-        orig_sim_obj = cv.Sim(self.pars, interventions=interventions, label='No-SAH')
+        orig_sim_obj = cv.Sim(self.pars, label='No-SAH')
         # Run simulations:
         orig_sim_obj.run()
         self.orig_sim_obj = orig_sim_obj
 
-        # no_interventions = orig_sim_obj.to_df()
-        # no_interventions.to_csv('no-SAH.csv', index=False)
-
-        no_sah = orig_sim_obj.to_df()
-        no_sah.to_csv('no-SAH_new.csv', index=False)
+        no_interventions = orig_sim_obj.to_df()
+        no_interventions.to_csv('no-SAH.csv', index=False)
 
     def estimate_daily_prob(self, coverage, duration):
         """

@@ -11,9 +11,13 @@ Original file is located at
 """
 
 def cal_yld_precise(num_infected, num_mild, num_severe, num_critical, weights='default'):
-  # Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
+""" 
+Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
+Requires more detailed information on number infected people in each state of sickness (mild, severe, critical)
+so that the YLD can be calculated more precisely
 
-  # mild-moderate and symtomatic are used interchangeably
+note: mild-moderate and symtomatic are used interchangeably
+"""
 
   # Default disability weights for COVID-19 states
   if weights == 'default':
@@ -61,8 +65,13 @@ def cal_yld_precise(num_infected, num_mild, num_severe, num_critical, weights='d
 
 
 def cal_yld_avg(num_infected, weights='default'):
-  # Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
+"""
+Calculate Years Lived with Disability (YLD) for each state of sickness and sum them up
+Requires only the number of infected people to calculate the YLD.
+Use proportions to estimate the number of people in each state of sickness
 
+note: mild-moderate and symtomatic are used interchangeably
+"""
   # Default disability weights for COVID-19 states
   if weights == 'default':
       weights = {
@@ -117,11 +126,6 @@ def cal_yld_avg(num_infected, weights='default'):
 
 
 def cal_yll(num_death):
-  # if avg_life_expectancy == 'default':
-  #   # life expectancy at birth in the US 2019, before pandemic
-  #   avg_life_expectancy = 78.8
-  #   # source: https://www.cdc.gov/nchs/pressroom/nchs_press_releases/2020/202012.htm
-
  # the average person dying of COVID-19 had 11.7 y of remaining life expectancy
  # source: https://www.pnas.org/doi/10.1073/pnas.2006392117#sec-4
 
@@ -148,3 +152,15 @@ def cal_econ_daly_precise(covasim_result_df, price_per_daly=95075):
   num_infected = covasim_result_df['cum_infections'].iloc[-1]
   
   return cal_daly_precise(num_infected, num_mild, num_severe, num_critical, num_death) * price_per_daly
+
+
+
+
+def dummy():
+  import pandas as pd
+  df = pd.read_csv("/home/mlq/fed model/no-SAH.csv")
+  daly = cal_econ_daly_precise(df)*331
+  print(daly)
+
+if __name__ == '__main__':
+  dummy()

@@ -13,35 +13,52 @@ class Covasim():
         self.start_stayhome = None
         self.duration_stayhome = None
         self.pars = dict(
-                pop_size  = 1_0_00,
+                pop_size  = 1_000_000,
                 start_day = '2020-01-05',
                 end_day   = '2023-12-31',
                 pop_type  = 'hybrid',
                 location = 'usa',
                 pop_infected = 1,
-                # beta           = 0.13,                  
-                # rel_death_prob = 2.67,        
-
                 beta =  0.12589663971276277,
                 rel_death_prob =  1.2706887764359567            
             )
 
     def orig_sim(self):
-        orig_sim_obj = cv.Sim(self.pars, label='No-SAH')
+        """
+        Simulate the pandemic scenario without SAH interventions
+        """
+        # Define sim with simulations:
+        dummy = cv.change_beta(days=['2020-12-13'], changes=[1.0], show_label=False, label="Start Vaccination", line_args={'color': 'tab:blue'}, do_plot=False) # dummy intervention to mark the start of vaccination
+        test = self.testing_historical()
+        ct = cv.contact_tracing(trace_probs=dict(h=1.0, s=0.5, w=0.5, c=0.3), do_plot=False)
+        vax_campaigns = self.vax_simple()
+        interventions = [test, ct, dummy] + vax_campaigns
+
+        orig_sim_obj = cv.Sim(self.pars, interventions=interventions, label='No-SAH')
         # Run simulations:
         orig_sim_obj.run()
         self.orig_sim_obj = orig_sim_obj
 
-        no_interventions = orig_sim_obj.to_df()
-        no_interventions.to_csv('no-SAH.csv', index=False)
+        # no_interventions = orig_sim_obj.to_df()
+        # no_interventions.to_csv('no-SAH.csv', index=False)
+
+        no_sah = orig_sim_obj.to_df()
+        no_sah.to_csv('no-SAH_new.csv', index=False)
 
     def estimate_daily_prob(self, coverage, duration):
+        """
+        support function for create_vaccination_campaign_precise
+        """
         if coverage <= 0 or coverage >= 1:
             return 0  # Edge cases
         p = 1 - (1 - coverage) ** (1 / duration)
         return p
 
     def create_vaccination_campaign_precise(self, row, sim_start_date, us_pop=331_000_000):
+        """"
+        support function for vax_precise
+        creates a 30-day vaccination campaign based on the monthly coverage
+        """
         # Convert the index to a datetime
         date = pd.to_datetime(f"{row.name[1]}-{row.name[0]}-01")
         
@@ -64,6 +81,9 @@ class Covasim():
         return campaign
 
     def testing_historical(self):
+        """
+        create a testing campaign based on the historical data
+        """
         pop_scale = 331000000/self.pars['pop_size']
         df = pd.read_csv("/home/mlq/fed model/covasim/COVID-19_Diagnostic_Laboratory_Testing__PCR_Testing__Time_Series_20240726.csv")
         df = df.groupby(['date']).sum()
@@ -85,6 +105,9 @@ class Covasim():
  
 
     def vax_precise(self):
+        """
+        create vaccination campaigns based on the monthly coverage
+        """
         df = self.vax_df
         df['date'] = pd.to_datetime(df['date'])
         df['month'] = df['date'].dt.month
@@ -99,6 +122,9 @@ class Covasim():
 
     def create_vaccination_campaign_simple(self, sim_start_date, vax_start_date, vax_end_date, vax_pop,
                                             label=None, do_plot=False, line_args=None, show_label=False):    
+        """
+        support function for vax_simple
+        """
         # Calculate days since simulation start
         vax_start_date = (vax_start_date - sim_start_date).days
         vax_end_date = (vax_end_date - sim_start_date).days
@@ -120,6 +146,10 @@ class Covasim():
         return campaign
 
     def vax_simple(self, us_pop=331_000_000):
+        """
+        simple simulation of vaccination campaigns to optimize run time
+        1 campaign per year, the doses are distributed evenly over the year
+        """
         df = self.vax_df
         df['date'] = pd.to_datetime(df['date'])
         df['year'] = df['date'].dt.year
@@ -130,7 +160,6 @@ class Covasim():
 
         # Convert start_day to datetime
         sim_start_date = pd.to_datetime(self.pars['start_day'])
-        # print(sim_start_date)
         # Group the DataFrame by six-month periods and create vaccination campaigns
         vax2020 = self.create_vaccination_campaign_simple(sim_start_date=sim_start_date, vax_start_date=pd.to_datetime("2020-12-01"), vax_end_date=pd.to_datetime("2020-12-31"), vax_pop=df.loc[2020, 'delta_total_vax'],
                                                         do_plot=False, line_args={'color': 'tab:blue'}, label='Start Vaccination', show_label=False)
@@ -146,6 +175,10 @@ class Covasim():
         return vaccination_campaigns
 
     def week_to_date(self, week):
+        """
+        convert week to date to be suitable for covasim
+        e.g: week 5 -> '2020-02-09'
+        """
         # Create a date range starting from the beginning of 2020
         date_range = pd.date_range(start='2020-01-01', periods=week, freq='W')
         # Get the last date in the range
@@ -154,11 +187,9 @@ class Covasim():
         return end_date.date().strftime('%Y-%m-%d')
 
     def custom_sim(self, start_stayhome, duration_stayhome, reduced_beta=0.5, save_csv = None):
-        # transmission rate = beta = 0.13
 
         start_stayhome_date = self.week_to_date(start_stayhome)
         end_stayhome_date = self.week_to_date(start_stayhome + duration_stayhome)
-        # print("start-end covasim",start_stayhome_date, end_stayhome_date)
 
         # Define sim with simulations:
         lockdown = cv.change_beta(days=[start_stayhome_date, end_stayhome_date], changes=[reduced_beta, 1.0], show_label=True, label="SAH Period") # 0.4 means reduce transmission rate by 60% to 0.4
@@ -167,7 +198,6 @@ class Covasim():
         ct = cv.contact_tracing(trace_probs=dict(h=1.0, s=0.5, w=0.5, c=0.3), do_plot=False)
         vax_campaigns = self.vax_simple()
         interventions = [lockdown, test, ct, dummy] + vax_campaigns
-        # self.pars['interventions'] = interventions
 
  
         sim = cv.Sim(self.pars, interventions=interventions, label='Custom-SAH')
@@ -189,6 +219,6 @@ class Covasim():
 
 if __name__ == '__main__':
     covasim = Covasim()
-    covasim.custom_sim(5, 6)
-    # covasim.orig_sim()
+    # covasim.custom_sim(5, 6)
+    covasim.orig_sim()
     

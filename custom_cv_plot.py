@@ -3,8 +3,10 @@ import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-df_orig = pd.read_csv("/home/mlq/fed model/no-SAH.csv")
-df_sah = pd.read_csv("/home/mlq/fed model/SAH_5_12_30per_aerr.csv")
+# df_orig = pd.read_csv("/home/mlq/fed model/no-SAH.csv")
+df_orig = pd.read_csv("/home/mlq/fed model/covasim/no-SAH_new.csv")
+df_sah = pd.read_csv("/home/mlq/fed model/SAH_5_15.csv")
+
 
 
 fig, ax = plt.subplots(4, 1, figsize=(15, 13))
@@ -13,7 +15,7 @@ fig, ax = plt.subplots(4, 1, figsize=(15, 13))
 plt.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.95, hspace=0.55)
 colors = ['tab:blue', 'tab:red']  # Specify the colors for the lines
 
-fig.suptitle('COVID-19 Comparison (β$_{SAH}=0.3$)', fontsize=14, y=0.985, x=0.525)
+fig.suptitle('COVID-19 Comparison (β$_{SAH}=0.5$)', fontsize=14, y=0.985, x=0.525)
 
 
 for i in range(4):
@@ -62,7 +64,7 @@ ax[3].set_title('Cumulative Deaths')
 start_vax = (pd.to_datetime("2020-12-13") - pd.to_datetime("2020-01-05")).days
 
 start_sah = pd.to_datetime("2020-01-05") + pd.DateOffset(weeks=5)
-end_sah = start_sah + pd.DateOffset(weeks=11)
+end_sah = start_sah + pd.DateOffset(weeks=14)
 
 start_sah = (start_sah - pd.to_datetime("2020-01-05")).days
 end_sah = (end_sah - pd.to_datetime("2020-01-05")).days
@@ -80,4 +82,5 @@ for i in range(4):
 
 
 plt.show()
-plt.savefig('SAH_5_12_30per_aerr.png')
+# plt.savefig('SAH_5_12_30per_aerr.png')
+plt.savefig('new_SAH_5_15.png')

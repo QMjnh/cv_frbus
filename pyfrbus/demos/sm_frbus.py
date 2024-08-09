@@ -18,7 +18,6 @@ class sm_frbus():
         self.verbose = verbose
         self.start = start
         self.end = end
-        # self.real_stayhome = 8 # weeks that the stay-at-home orders is in effect in real life
         self.variables = pd.read_csv("/home/mlq/fed model/pyfrbus/demos/model architecture/model_variables_simple.csv")
         self.dynamic_variables = self.variables[(self.variables["sector"] == "Labor Market") | (self.variables["sector"] == "Household Expenditures")
                             | (self.variables["sector"] == "Aggregate Output Identities")].name
@@ -33,6 +32,7 @@ class sm_frbus():
         self.no_stayhome = self.solve_no_stayhome()
         self.stayhome_anticipated_errors = self.cal_stayhome_anticipated_errors()
         self.custom_stayhome = None
+
     def solve_no_pandemic(self):
         """
         Solve the model for the no pandemic scenario
@@ -56,6 +56,10 @@ class sm_frbus():
         return data_trac_const, targ_trac_const, traj_trac_const, inst_trac_const
 
     def trac_non_dynamic_variables(self):
+    """
+        all variables will be applied with init_trac() which would keep them constant with historical data,
+        except for dynamic variables which will be set to zero so they can change depending on the SAH scenario
+    """
         dummy = self.model.init_trac(self.start, self.end, self.data)
         for name in self.dynamic_variables:
             try:
@@ -69,6 +73,10 @@ class sm_frbus():
         return dummy
 
     def week_to_quarter(self, week):
+        """
+        convert week to quarter
+        e.g: week 12 -> 2020Q2
+        """
         # Create a date range starting from the beginning of 2020
         date_range = pd.date_range(start='2020-01-01', periods=week, freq='W')
         # Get the last date in the range
@@ -76,6 +84,13 @@ class sm_frbus():
         return end_date.to_period('Q')
 
     def calculate_weekly_values(self, start_value_leh, bool_values, decrease_rate=0.019):
+        """
+        support function for calculate_quarterly_average
+        leh: Civilian employment (break adjusted)
+        Calculate weekly values for the leh variable. 
+        bool_values: A boolean array with 1s during the stay-at-home order and 0s for the rest
+        leh(t) = leh(t-1) * (1 - decrease_rate) 
+        """
         # Convert bool_values to numpy array
         bool_values = np.array(bool_values)        
         # Calculate weekly values for leh
@@ -84,6 +99,10 @@ class sm_frbus():
         return weekly_values_leh
 
     def calculate_quarterly_average(self, start_value_leh, start_week, duration, decrease_rate=0.019):
+        """
+        Calculate quarterly averages for the leh variable
+        start_value_leh: The value of leh before the quarter with stay-at-home orders        
+        """
         start_value_leh = start_value_leh
         # Create a boolean array with 1s for the duration and 0s for the rest
         bool_values = np.zeros(start_week + duration)
@@ -115,17 +134,16 @@ class sm_frbus():
         # Resample the series to quarterly frequency and calculate mean
         quarterly_avg_leh = series_leh.groupby(series_leh.index).mean()
 
-
         delta_leh = pd.concat([pd.Series(start_value_leh), quarterly_avg_leh])
         delta_leh = delta_leh.diff().dropna()
-
-        # print("\n\nquarter leh", quarterly_avg_leh)
-        # print("\ndelta", delta_leh)
 
         # Return the quarterly averages and weekly series for verification
         return quarterly_avg_leh, delta_leh, start_value_leh
 
     def solve_no_stayhome(self, start_stayhome_week=12, duration=6):
+        """
+        Solve the model for the no stay-at-home orders scenario
+        """
         if self.verbose!=False:
             print("Creating no stay-at-home orders scenario...")
 
@@ -158,6 +176,11 @@ class sm_frbus():
         return no_stayhome_result
 
     def cal_stayhome_anticipated_errors(self, start_stayhome_week=12, duration=6, end_stayhome=pd.Period("2020Q2")):
+        """
+        Calculate anticipated errors for the stay-at-home orders scenario
+
+        anticipated error = historical data - SAH simulation with num_weeks=real SAH duration  
+        """
         if self.no_stayhome is None:
             raise Exception("No stayhome scenario has been solved yet. Please run solve_no_stayhome() first.")
         stayhome_aerr_data = self.no_stayhome.copy(deep=True)
@@ -191,16 +214,18 @@ class sm_frbus():
 
     def solve_custom_stayhome(self, start_lockdown_opt=12, custom_lockdown_duration=17,
                              targ_custom=None, traj_custom=None, inst_custom=None, custom_stayhome_data=None):
+
+        """
+        Solve the model for a custom stay-at-home orders scenario
+        """
         if self.verbose!=False:
             print("Creating custom stay-at-home orders scenario...")
         if not targ_custom or not traj_custom or not inst_custom:
             print("No custom targets, trajectories and instruments provided. Using default empty values.")
             targ_custom, traj_custom, inst_custom = [], [], []
 
-        # print("\n", start_lockdown_opt,"\n")
         end_lockdown_quarter = self.week_to_quarter(start_lockdown_opt + custom_lockdown_duration)        
         start_lockdown_quarter = self.week_to_quarter(start_lockdown_opt)
-        # print("\n", end_lockdown_quarter,"\n")
         
         targ_custom += ['leh',]
         traj_custom += ['leh_t', ]

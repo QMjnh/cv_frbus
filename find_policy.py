@@ -561,23 +561,21 @@ def joblib_parallel_gradient_descent_with_adam(run_func, policy, learning_rate=0
     return best_policy, policy_history, loss_history
 
 
-
-
-
-
-
-
-
 def total_econ_loss(covasim_model, econ_model, policy):
     """
     This function is to calculate economic loss (daly + loss gdp) due to the pandemic
     """
     return cal_econ_daly(covasim_model, policy) + cal_gdp_loss(econ_model, policy)
 
+
+
+
+
+
 def dummy_loss(j, y, k):
     return (k**2 + j ** 2 + y ** 2)**2
 
-def main():
+def dummy_main():
     # gradient_descent(total_econ_loss, policy)
     policy = {'j': 3, 'y': 5, 'k': 4}
 
@@ -588,4 +586,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    dummy_main()

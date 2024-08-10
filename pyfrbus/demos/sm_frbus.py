@@ -21,10 +21,6 @@ class sm_frbus():
         self.variables = pd.read_csv("/home/mlq/fed model/pyfrbus/demos/model architecture/model_variables_simple.csv")
         self.dynamic_variables = self.variables[(self.variables["sector"] == "Labor Market") | (self.variables["sector"] == "Household Expenditures")
                             | (self.variables["sector"] == "Aggregate Output Identities")].name
-        self.const_variables = self.variables[(self.variables["sector"] == "Foreign Activity") 
-                            | (self.variables["sector"] == "Foreign Trade")
-                            | (self.variables["sector"] == "Government")
-                            ].name
 
         self.loss_df = None
         self.control = None 
@@ -42,18 +38,6 @@ class sm_frbus():
         result = self.model.solve(self.start, self.end, self.data)
         return result
 
-    def trac_const_variables(self):
-        targ_trac_const, traj_trac_const, inst_trac_const = [], [], []
-        data_trac_const = self.no_stayhome.copy(deep=True)
-        for name in self.const_variables:
-            try:
-                data_trac_const.loc[self.start:self.end, f"{name}_t"] = self.data.loc[self.start:self.end, name]
-                targ_trac_const.append(name)
-                traj_trac_const.append(f"{name}_t")
-                inst_trac_const.append(name)
-            except Exception as e:
-                print(f"Can't create trajectory for variable '{name}', exception message: {e}")
-        return data_trac_const, targ_trac_const, traj_trac_const, inst_trac_const
 
     def trac_non_dynamic_variables(self):
     """

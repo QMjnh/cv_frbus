@@ -5,7 +5,15 @@ We propose an integrated economic-epidemiological model that optimizes lockdown 
 
 Read the full paper at https://lequ02.github.io/cv_frbus/Research_Paper_cv_frbus.pdf
 
-### Acknowledgements:
+
+## Quick manual
+
+1. Run cv_frbus.py to find the best policy. Save the best policy to a .csv file
+2. Run custom_cv_plot.py to get the COVID-19 Comparison plot
+3. Run ./pyfrbus/demos/sm_frbus.py to get the Economic Comparision plot
+
+
+## Acknowledgements:
 The FRB/US package is downloaded from the Federal Reserve Board of the United States (https://www.federalreserve.gov/econres/us-models-python.htm)
 
 The SIR-MACRO code is downloaded from https://github.com/bbardoczy/sir-macro.
